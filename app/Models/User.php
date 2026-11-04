@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -41,5 +42,26 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'admin_status' => 'boolean',
     ];
+
+    /**
+     * このユーザーの勤怠を返す。
+     *
+     * @return HasMany このユーザーの勤怠の一覧
+     */
+    public function attendanceRecords(): HasMany
+    {
+        return $this->hasMany(AttendanceRecord::class);
+    }
+
+    /**
+     * このユーザーの修正申請を返す。
+     *
+     * @return HasMany このユーザーの修正申請の一覧
+     */
+    public function applications(): HasMany
+    {
+        return $this->hasMany(Application::class);
+    }
 }
