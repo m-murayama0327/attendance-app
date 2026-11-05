@@ -9,8 +9,10 @@ use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Http\Requests\LoginRequest;
 use App\Http\Responses\LoginResponse;
 use App\Http\Responses\LogoutResponse;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -37,6 +39,7 @@ class FortifyServiceProvider extends ServiceProvider
 
     /**
      * Bootstrap any application services.
+     * 管理者と一般ユーザーの入口を分けるため、ログインの照合と出す画面を、入口のパスで分ける。
      *
      * @return void 返す値はない
      */
@@ -44,7 +47,16 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(fn () => view('user.register'));
-        Fortify::loginView(fn () => view('user.user-login'));
+        Fortify::loginView(fn (Request $request) => $request->is('admin/login') ? view('admin.admin-login') : view('user.user-login'));
+        Fortify::authenticateUsing(function (Request $request) {
+            $user = User::where('email', $request->email)->first();
+
+            if ($user && Hash::check($request->password, $user->password) && $user->admin_status === $request->is('admin/login')) {
+                return $user;
+            }
+
+            return null;
+        });
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
