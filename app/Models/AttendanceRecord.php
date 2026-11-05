@@ -101,6 +101,59 @@ class AttendanceRecord extends Model
         $this->save();
     }
 
+    /**
+     * 今の時刻で出勤を打刻し、今日の勤怠を返す。同じ日の勤怠がもうあれば、その行を返して書き換えない。
+     *
+     * @param  User  $user  出勤するユーザー
+     * @return self 今日の勤怠
+     */
+    public static function clockIn(User $user): self
+    {
+        $record = self::createOrFirst(
+            ['user_id' => $user->id, 'date' => today()->toDateString()],
+            ['clock_in' => now()->toTimeString()],
+        );
+
+        if ($record->wasRecentlyCreated) {
+            $record->recalculate();
+        }
+
+        return $record;
+    }
+
+    /**
+     * 今の時刻で退勤を打刻する。
+     *
+     * @return void 返す値はない（退勤の時刻と計算した値を、この勤怠に保存する）
+     */
+    public function clockOut(): void
+    {
+        $this->clock_out = now()->toTimeString();
+        $this->recalculate();
+    }
+
+    /**
+     * 今の時刻で休憩入を打刻し、休憩の行を作る。
+     *
+     * @return void 返す値はない（休憩の行と計算した値を保存する）
+     */
+    public function breakIn(): void
+    {
+        $this->breaks()->create(['break_in' => now()->toTimeString()]);
+        $this->recalculate();
+    }
+
+    /**
+     * 今の時刻で休憩戻を打刻し、戻りのない休憩のうち最新の1行に戻りの時刻を書く。
+     *
+     * @return void 返す値はない（休憩の戻りと計算した値を保存する）
+     */
+    public function breakOut(): void
+    {
+        $this->breaks()->whereNull('break_out')->latest('break_in')->first()->update(['break_out' => now()->toTimeString()]);
+        $this->recalculate();
+    }
+
     private function toMinutes(string $time): int
     {
         // 画面に出る時刻と計算の結果を合わせるため、秒は切り捨てる
