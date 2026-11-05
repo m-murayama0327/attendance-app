@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -63,5 +63,42 @@ class User extends Authenticatable
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class);
+    }
+
+    /**
+     * 今日の勤怠を返す。今日の行がなければ null を返す。
+     *
+     * @return AttendanceRecord|null 今日の勤怠
+     */
+    public function findTodayAttendanceRecord(): ?AttendanceRecord
+    {
+        return $this->attendanceRecords()->where('date', today()->toDateString())->first();
+    }
+
+    /**
+     * 今日の勤怠と休憩から、勤務外、出勤中、休憩中、退勤済のどれかを返す（`$user->attendance_status` で読む）。
+     * 打刻の直後に古い状態を出さないよう、読むたびにデータベースを読む。
+     *
+     * @return Attribute<string, never> 打刻の状態の文字
+     */
+    protected function attendanceStatus(): Attribute
+    {
+        return Attribute::get(function (): string {
+            $record = $this->findTodayAttendanceRecord();
+
+            if ($record === null) {
+                return '勤務外';
+            }
+
+            if ($record->clock_out !== null) {
+                return '退勤済';
+            }
+
+            if ($record->breaks()->whereNull('break_out')->exists()) {
+                return '休憩中';
+            }
+
+            return '出勤中';
+        });
     }
 }
