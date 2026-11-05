@@ -8,12 +8,14 @@ use Tests\TestCase;
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * ログインしていない人が `/` を開くと、ログイン画面へ移ることを確かめる。
+     *
+     * @return void 返す値はない
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_guest_redirects_to_login(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        $response->assertRedirect('/login');
     }
 }
