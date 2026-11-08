@@ -27,6 +27,24 @@ class AttendanceController extends Controller
     }
 
     /**
+     * 勤怠一覧の画面を出す。?date= の値から表示する月を決め、その月の全部の日の行を渡す。
+     *
+     * @param  Request  $request  届いたリクエスト（?date= に表示する月）
+     * @return View 勤怠一覧の画面
+     */
+    public function list(Request $request): View
+    {
+        $monthView = AttendanceRecord::resolveMonthView($request->query('date'));
+
+        return view('user.user-attendance-list', [
+            'date' => $monthView['date'],
+            'previousMonth' => $monthView['previousMonth'],
+            'nextMonth' => $monthView['nextMonth'],
+            'formattedAttendanceRecords' => AttendanceRecord::monthlyRows($request->user(), $monthView['date']),
+        ]);
+    }
+
+    /**
      * 押したボタンが今の状態でできる打刻なら、時刻を書く。できない打刻なら、何も書かない。どちらも打刻の画面に戻す。
      *
      * @param  StampRequest  $request  押したボタン（action）を確かめたリクエスト
