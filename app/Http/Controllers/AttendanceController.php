@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AttendanceDetailRequest;
 use App\Http\Requests\StampRequest;
 use App\Models\AttendanceRecord;
 use Illuminate\Http\RedirectResponse;
@@ -71,5 +72,95 @@ class AttendanceController extends Controller
         });
 
         return redirect('/attendance');
+    }
+
+    /**
+     * 勤怠詳細の画面を出す。他の人の勤怠なら 403 にする。勤怠がなければ、ルートモデルバインディングが 404 にする。
+     * 承認待ちの申請がなく、入力の誤りで戻ったときは、備考の書き忘れだけで時刻を打ち直さないよう、送った値で時刻、休憩、備考を置き換える。
+     *
+     * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
+     * @param  AttendanceRecord  $attendanceRecord  URL の id で読んだ勤怠
+     * @return View 勤怠詳細の画面
+     */
+    public function show(Request $request, AttendanceRecord $attendanceRecord): View
+    {
+        $this->authorize('view', $attendanceRecord);
+
+        $detail = $attendanceRecord->toDetailData();
+        $detail['application'] = $attendanceRecord->pendingApplication();
+
+        if ($detail['application'] === null && $request->session()->hasOldInput()) {
+            $breakIns = $request->old('new_break_in', []);
+            $breakOuts = $request->old('new_break_out', []);
+            $breaks = [];
+
+            // 送った行の番号を保ち、エラーの文言が同じ行に出るようにする
+            foreach (is_array($breakIns) ? $breakIns : [] as $index => $breakIn) {
+                $breaks[$index] = [
+                    'break_in' => $breakIn,
+                    'break_out' => is_array($breakOuts) ? ($breakOuts[$index] ?? null) : null,
+                ];
+            }
+
+            // 画面が最後に追加用の空の行を足すので、送った最後の行が両方空なら除き、空の行が2つ並ばないようにする
+            $lastIndex = array_key_last($breaks);
+
+            if ($lastIndex !== null && blank($breaks[$lastIndex]['break_in']) && blank($breaks[$lastIndex]['break_out'])) {
+                unset($breaks[$lastIndex]);
+            }
+
+            $detail = array_merge($detail, [
+                'clock_in' => $request->old('new_clock_in'),
+                'clock_out' => $request->old('new_clock_out'),
+                'breaks' => $breaks,
+                'comment' => $request->old('comment'),
+            ]);
+        }
+
+        return view('user.user-detail', [
+            'data' => $detail,
+            'user' => $attendanceRecord->user,
+        ]);
+    }
+
+    /**
+     * 修正申請を作り、勤怠詳細の画面へ戻す。勤怠の値は変えず、承認のときに変える。
+     * 承認待ちの申請がある勤怠には、画面に修正のボタンが出なくても送られうるので、ここでも申請を作らない。
+     *
+     * @param  AttendanceDetailRequest  $request  勤怠を直してよい人と入力の決まりを確かめたリクエスト
+     * @param  AttendanceRecord  $attendanceRecord  URL の id で読んだ勤怠
+     * @return RedirectResponse 勤怠詳細の画面への転送
+     */
+    public function update(AttendanceDetailRequest $request, AttendanceRecord $attendanceRecord): RedirectResponse
+    {
+        if ($attendanceRecord->pendingApplication() !== null) {
+            return redirect('/attendance/'.$attendanceRecord->id);
+        }
+
+        DB::transaction(function () use ($request, $attendanceRecord): void {
+            $application = $attendanceRecord->applications()->create([
+                'new_clock_in' => $request->validated('new_clock_in'),
+                'new_clock_out' => $request->validated('new_clock_out'),
+                'comment' => $request->validated('comment'),
+            ]);
+
+            $breakOuts = $request->validated('new_break_out', []);
+
+            foreach ($request->validated('new_break_in', []) as $index => $breakIn) {
+                $breakOut = $breakOuts[$index] ?? null;
+
+                // 入りと戻りが両方空の行は、追加用の空の行か、消した休憩の行なので、申請の休憩にしない
+                if (blank($breakIn) && blank($breakOut)) {
+                    continue;
+                }
+
+                $application->proposalBreaks()->create([
+                    'break_in' => $breakIn,
+                    'break_out' => $breakOut,
+                ]);
+            }
+        });
+
+        return redirect('/attendance/'.$attendanceRecord->id);
     }
 }
