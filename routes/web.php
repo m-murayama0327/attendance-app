@@ -23,4 +23,10 @@ Route::post('/admin/logout', [AuthenticatedSessionController::class, 'destroy'])
 Route::middleware(['auth', 'general'])->group(function () {
     Route::get('/attendance', [AttendanceController::class, 'index']);
     Route::post('/attendance', [AttendanceController::class, 'store']);
+    Route::get('/attendance/list', [AttendanceController::class, 'list']);
+    Route::get('/attendance/detail/{attendanceRecord}', [AttendanceController::class, 'show'])->whereNumber('attendanceRecord');
+});
+Route::middleware('auth')->group(function () {
+    Route::get('/attendance/{attendanceRecord}', [AttendanceController::class, 'show'])->whereNumber('attendanceRecord');
+    Route::post('/attendance/{attendanceRecord}', [AttendanceController::class, 'update'])->whereNumber('attendanceRecord');
 });

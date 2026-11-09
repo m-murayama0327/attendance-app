@@ -6,13 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Application extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
         'attendance_record_id',
         'new_clock_in',
         'new_clock_out',
@@ -24,13 +24,14 @@ class Application extends Model
     ];
 
     /**
-     * この申請を出したユーザーを返す。
+     * この申請の勤怠の持ち主のユーザーを返す。
+     * 申請は user_id を持たないため、勤怠を通して読む。
      *
-     * @return BelongsTo この申請を出したユーザー
+     * @return HasOneThrough この申請の勤怠の持ち主のユーザー
      */
-    public function user(): BelongsTo
+    public function user(): HasOneThrough
     {
-        return $this->belongsTo(User::class);
+        return $this->hasOneThrough(User::class, AttendanceRecord::class, 'id', 'id', 'attendance_record_id', 'user_id');
     }
 
     /**

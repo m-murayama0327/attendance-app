@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use Carbon\CarbonPeriod;
+use Carbon\Exceptions\InvalidFormatException;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class AttendanceRecord extends Model
 {
@@ -152,6 +156,146 @@ class AttendanceRecord extends Model
     {
         $this->breaks()->whereNull('break_out')->latest('break_in')->first()->update(['break_out' => now()->toTimeString()]);
         $this->recalculate();
+    }
+
+    /**
+     * 渡されたユーザーと月について、月の全部の日の勤怠一覧の行を返す。勤怠のない日は、日付のほかを null にする。
+     *
+     * @param  User  $user  勤怠を読むユーザー
+     * @param  Carbon  $month  表示する月の中の日
+     * @return array<int, array<string, int|string|null>> 日ごとの行（date、clock_in、clock_out、total_break_time、total_time、id）
+     */
+    public static function monthlyRows(User $user, Carbon $month): array
+    {
+        $start = $month->copy()->startOfMonth();
+        $end = $month->copy()->endOfMonth();
+
+        $records = self::where('user_id', $user->id)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->get()
+            ->keyBy('date');
+
+        return collect(CarbonPeriod::create($start, $end))
+            ->map(function (Carbon $day) use ($records): array {
+                $record = $records->get($day->toDateString());
+
+                return [
+                    'date' => $day->isoFormat('MM/DD(ddd)'),
+                    'clock_in' => $record?->formattedClockIn(),
+                    'clock_out' => $record?->formattedClockOut(),
+                    'total_break_time' => $record?->total_break_time,
+                    'total_time' => $record?->total_time,
+                    'id' => $record?->id,
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * ?date= の値から、表示する月の初めの日と、前の月と次の月の値を返す。値がないか読めないときは、今の月にする。
+     *
+     * @param  mixed  $value  ?date= の値
+     * @return array{date: Carbon, previousMonth: string, nextMonth: string} 表示する月の初めの日と、前月と翌月の Y-m
+     */
+    public static function resolveMonthView(mixed $value): array
+    {
+        $date = today()->startOfMonth();
+
+        if (is_string($value)) {
+            try {
+                $date = Carbon::parse($value)->startOfMonth();
+            } catch (InvalidFormatException) {
+                // 読めない値はエラーを出す画面がないので、今の月のままにする
+            }
+        }
+
+        return [
+            'date' => $date,
+            'previousMonth' => $date->copy()->subMonth()->format('Y-m'),
+            'nextMonth' => $date->copy()->addMonth()->format('Y-m'),
+        ];
+    }
+
+    /**
+     * この勤怠への承認待ちの修正申請を返す。なければ null を返す。
+     *
+     * @return Application|null 承認待ちの修正申請
+     */
+    public function pendingApplication(): ?Application
+    {
+        return $this->applications()->where('is_approved', false)->first();
+    }
+
+    /**
+     * 勤怠詳細の画面に渡す値を返す。休憩は入りの早い順に、0からの連番で並べる。
+     *
+     * @return array<string, mixed> id、year、date、clock_in、clock_out、breaks、comment
+     */
+    public function toDetailData(): array
+    {
+        $date = Carbon::parse($this->date);
+
+        return [
+            'id' => $this->id,
+            'year' => $date->format('Y年'),
+            'date' => $date->format('n月j日'),
+            'clock_in' => $this->formattedClockIn(),
+            'clock_out' => $this->formattedClockOut(),
+            'breaks' => $this->breaks()
+                ->orderBy('break_in')
+                ->get()
+                ->map(fn (AttendanceBreak $break): array => [
+                    'break_in' => $break->formattedBreakIn(),
+                    'break_out' => $break->formattedBreakOut(),
+                ])
+                ->all(),
+            'comment' => $this->comment,
+        ];
+    }
+
+    /**
+     * 出勤を H:i の文字で返す。
+     *
+     * @return string 出勤（例：09:00）
+     */
+    public function formattedClockIn(): string
+    {
+        return substr($this->clock_in, 0, 5);
+    }
+
+    /**
+     * 退勤を H:i の文字で返す。退勤がなければ null を返す。
+     *
+     * @return string|null 退勤（例：18:00）
+     */
+    public function formattedClockOut(): ?string
+    {
+        return $this->clock_out === null ? null : substr($this->clock_out, 0, 5);
+    }
+
+    /**
+     * 勤務時間を 08:00 の形で返すアクセサ。total_time の名前で読む。勤務時間が空なら null を返す。
+     *
+     * @return Attribute<string|null, never> 勤務時間の文字
+     */
+    protected function totalTime(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->work_minutes === null ? null : $this->toHourMinuteText($this->work_minutes));
+    }
+
+    /**
+     * 休憩時間を 01:00 の形で返すアクセサ。total_break_time の名前で読む。休憩時間が空か0なら null を返す。
+     *
+     * @return Attribute<string|null, never> 休憩時間の文字
+     */
+    protected function totalBreakTime(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->break_minutes ? $this->toHourMinuteText($this->break_minutes) : null);
+    }
+
+    private function toHourMinuteText(int $minutes): string
+    {
+        return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
     }
 
     private function toMinutes(string $time): int
