@@ -105,7 +105,7 @@
                 </div>
 
             @else
-                {{-- 承認待ちあり：閲覧のみ --}}
+                {{-- 申請あり：閲覧のみ --}}
                 <div class="form__content">
                     <div class="form__group">
                         <label class="form__header">名前</label>
@@ -156,7 +156,7 @@
                 </div>
 
                 <div class="form__button">
-                    <p class="readonly-message">承認待ちのため修正はできません。</p>
+                    <p class="readonly-message">{{ $data['application']->is_approved ? '承認済みの申請です。' : '承認待ちのため修正はできません。' }}</p>
                 </div>
             @endif
 

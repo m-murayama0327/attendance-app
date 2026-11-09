@@ -21,4 +21,21 @@ class ApplicationController extends Controller
             'user' => $request->user(),
         ]);
     }
+
+    /**
+     * 申請詳細の画面を出す。申請した人でなければ 403 にする。申請がなければ、ルートモデルバインディングが 404 にする。
+     * 承認待ちでも承認済みでも、押した申請の値を読み取り専用の形で出す。
+     *
+     * @param  Application  $application  URL の id で読んだ申請
+     * @return View 申請詳細の画面
+     */
+    public function show(Application $application): View
+    {
+        $this->authorize('view', $application);
+
+        return view('user.user-detail', [
+            'data' => $application->toDetailData(),
+            'user' => $application->AttendanceRecord->user,
+        ]);
+    }
 }
