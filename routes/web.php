@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\HomeController;
 use Illuminate\Support\Facades\Route;
@@ -29,4 +30,5 @@ Route::middleware(['auth', 'general'])->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/attendance/{attendanceRecord}', [AttendanceController::class, 'show'])->whereNumber('attendanceRecord');
     Route::post('/attendance/{attendanceRecord}', [AttendanceController::class, 'update'])->whereNumber('attendanceRecord');
+    Route::get('/stamp_correction_request/list', [ApplicationController::class, 'index']);
 });
