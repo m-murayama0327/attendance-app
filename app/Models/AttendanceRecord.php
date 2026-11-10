@@ -280,14 +280,16 @@ class AttendanceRecord extends Model
 
     /**
      * 勤怠詳細の画面に渡す値を返す。休憩は入りの早い順に、0からの連番で並べる。
+     * エラーで戻ったときに送った値を渡すと、備考の書き忘れだけで時刻を打ち直さないよう、時刻、休憩、備考を送った値に置き換える。
      *
+     * @param  array<string, mixed>  $oldInput  エラーで戻ったときに送った値（なければ空の配列で、勤怠の値のまま返す）
      * @return array<string, mixed> id、year、date、clock_in、clock_out、breaks、comment
      */
-    public function toDetailData(): array
+    public function toDetailData(array $oldInput = []): array
     {
         $date = Carbon::parse($this->date);
 
-        return [
+        $detail = [
             'id' => $this->id,
             'year' => $date->format('Y年'),
             'date' => $date->format('n月j日'),
@@ -303,6 +305,36 @@ class AttendanceRecord extends Model
                 ->all(),
             'comment' => $this->comment,
         ];
+
+        if ($oldInput === []) {
+            return $detail;
+        }
+
+        $breakIns = $oldInput['new_break_in'] ?? [];
+        $breakOuts = $oldInput['new_break_out'] ?? [];
+        $breaks = [];
+
+        // 送った行の番号を保ち、エラーの文言が同じ行に出るようにする
+        foreach (is_array($breakIns) ? $breakIns : [] as $index => $breakIn) {
+            $breaks[$index] = [
+                'break_in' => $breakIn,
+                'break_out' => is_array($breakOuts) ? ($breakOuts[$index] ?? null) : null,
+            ];
+        }
+
+        // 画面が最後に追加用の空の行を足すので、送った最後の行が両方空なら除き、空の行が2つ並ばないようにする
+        $lastIndex = array_key_last($breaks);
+
+        if ($lastIndex !== null && blank($breaks[$lastIndex]['break_in']) && blank($breaks[$lastIndex]['break_out'])) {
+            unset($breaks[$lastIndex]);
+        }
+
+        return array_merge($detail, [
+            'clock_in' => $oldInput['new_clock_in'] ?? null,
+            'clock_out' => $oldInput['new_clock_out'] ?? null,
+            'breaks' => $breaks,
+            'comment' => $oldInput['comment'] ?? null,
+        ]);
     }
 
     /**

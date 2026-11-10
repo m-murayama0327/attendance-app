@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\AttendanceDetailRequest;
 use App\Models\AttendanceRecord;
 use App\Models\User;
 use Carbon\Exceptions\InvalidFormatException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
@@ -45,5 +47,35 @@ class AttendanceController extends Controller
             'users' => $users,
             'attendanceRecords' => $attendanceRecords,
         ]);
+    }
+
+    /**
+     * 管理者の勤怠詳細の画面を出す。勤怠がなければ、ルートモデルバインディングが 404 にする。
+     * 承認待ちの申請があっても修正のフォームを出し、入力の誤りで戻ったときは、送った値で時刻、休憩、備考を置き換える。
+     *
+     * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
+     * @param  AttendanceRecord  $attendanceRecord  URL の id で読んだ勤怠
+     * @return View 管理者の勤怠詳細の画面
+     */
+    public function show(Request $request, AttendanceRecord $attendanceRecord): View
+    {
+        return view('admin.admin-detail', [
+            'attendanceRecord' => $attendanceRecord->toDetailData($request->session()->getOldInput()),
+            'user' => $attendanceRecord->user,
+        ]);
+    }
+
+    /**
+     * 勤怠を直接直し、勤怠詳細の画面へ戻す。承認待ちの申請があっても直し、申請は承認待ちのまま残す。
+     *
+     * @param  AttendanceDetailRequest  $request  勤怠を直してよい人と入力の決まりを確かめたリクエスト
+     * @param  AttendanceRecord  $attendanceRecord  URL の id で読んだ勤怠
+     * @return RedirectResponse 勤怠詳細の画面への転送
+     */
+    public function update(AttendanceDetailRequest $request, AttendanceRecord $attendanceRecord): RedirectResponse
+    {
+        $attendanceRecord->applyAdminEdit($request->validated());
+
+        return redirect('/attendance/'.$attendanceRecord->id);
     }
 }
