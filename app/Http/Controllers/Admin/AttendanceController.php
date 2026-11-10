@@ -50,6 +50,28 @@ class AttendanceController extends Controller
     }
 
     /**
+     * スタッフ別勤怠一覧を出す。id の一般ユーザーについて、?date= の値から表示する月を決め、その月の全部の日の行を渡す。
+     * id が一般ユーザーでない（管理者か、いない）ときは 404 にする。
+     *
+     * @param  Request  $request  届いたリクエスト（?date= に表示する月）
+     * @param  int  $id  URL の一般ユーザーの id
+     * @return View スタッフ別勤怠一覧の画面
+     */
+    public function staff(Request $request, int $id): View
+    {
+        $user = User::general()->findOrFail($id);
+        $monthView = AttendanceRecord::resolveMonthView($request->query('date'));
+
+        return view('admin.staff-attendance-list', [
+            'user' => $user,
+            'date' => $monthView['date'],
+            'previousMonth' => $monthView['previousMonth'],
+            'nextMonth' => $monthView['nextMonth'],
+            'formattedAttendanceRecords' => AttendanceRecord::monthlyRows($user, $monthView['date']),
+        ]);
+    }
+
+    /**
      * 管理者の勤怠詳細の画面を出す。勤怠がなければ、ルートモデルバインディングが 404 にする。
      * 承認待ちの申請があっても修正のフォームを出し、入力の誤りで戻ったときは、送った値で時刻、休憩、備考を置き換える。
      *

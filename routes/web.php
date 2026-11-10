@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
+use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\HomeController;
@@ -26,7 +27,9 @@ Route::post('/admin/login', [AuthenticatedSessionController::class, 'store'])->m
 Route::post('/admin/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('admin');
 Route::middleware('admin')->group(function () {
     Route::get('/admin/attendance/list', [AdminAttendanceController::class, 'index']);
+    Route::get('/admin/attendance/staff/{id}', [AdminAttendanceController::class, 'staff'])->whereNumber('id');
     Route::get('/admin/attendance/{attendanceRecord}', [AdminAttendanceController::class, 'show'])->whereNumber('attendanceRecord');
+    Route::get('/admin/staff/list', [StaffController::class, 'index']);
 });
 Route::middleware(['auth', 'general'])->group(function () {
     Route::get('/attendance', [AttendanceController::class, 'index']);

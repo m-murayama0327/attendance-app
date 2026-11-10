@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -65,6 +66,17 @@ class User extends Authenticatable
     public function applications(): HasManyThrough
     {
         return $this->hasManyThrough(Application::class, AttendanceRecord::class);
+    }
+
+    /**
+     * 管理者を除き、一般ユーザーだけに絞る。
+     *
+     * @param  Builder<User>  $query  絞る前のユーザーのクエリ
+     * @return void 返す値はない
+     */
+    public function scopeGeneral(Builder $query): void
+    {
+        $query->where('admin_status', false);
     }
 
     /**
