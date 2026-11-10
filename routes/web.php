@@ -27,6 +27,7 @@ Route::post('/admin/login', [AuthenticatedSessionController::class, 'store'])->m
 Route::post('/admin/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('admin');
 Route::middleware('admin')->group(function () {
     Route::get('/admin/attendance/list', [AdminAttendanceController::class, 'index']);
+    Route::get('/admin/attendance/staff/{id}', [AdminAttendanceController::class, 'staff'])->whereNumber('id');
     Route::get('/admin/attendance/{attendanceRecord}', [AdminAttendanceController::class, 'show'])->whereNumber('attendanceRecord');
     Route::get('/admin/staff/list', [StaffController::class, 'index']);
 });
