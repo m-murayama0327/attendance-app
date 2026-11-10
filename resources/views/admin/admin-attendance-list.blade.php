@@ -60,6 +60,26 @@
                 <a class="table__item--detail-link" href="{{ url('/attendance/' . $attendance['id']) }}">詳細</a>
             </td>
         </tr>
+        @else
+        {{-- まだ勤怠を登録していない人が分かるよう、勤怠がない人も名前だけの行を出す --}}
+        <tr class="table__row">
+            <td class="table__description">
+                <p class="table__description--item">{{ $user->name }}</p>
+            </td>
+            <td class="table__description">
+                <p class="table__description--item"></p>
+            </td>
+            <td class="table__description">
+                <p class="table__description--item"></p>
+            </td>
+            <td class="table__description">
+                <p class="table__description--item"></p>
+            </td>
+            <td class="table__description">
+                <p class="table__description--item"></p>
+            </td>
+            <td class="table__description"></td>
+        </tr>
         @endif
         @endforeach
     </table>

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceRecord extends Model
 {
@@ -159,6 +160,57 @@ class AttendanceRecord extends Model
     }
 
     /**
+     * 管理者の直接修正の値で、出勤、退勤、備考と休憩を書き換える。時と分を変えていない出勤と退勤は、今の値（秒を含む）を残す。
+     * 入りと戻りが両方空の休憩の行は、追加用の空の行か消した休憩の行なので、休憩にしない。
+     *
+     * @param  array{new_clock_in: string, new_clock_out: string, new_break_in?: array<int, string|null>, new_break_out?: array<int, string|null>, comment: string}  $validated  バリデーションを通った入力
+     * @return void 返す値はない（書き換えた値と計算した値を、この勤怠に保存する）
+     */
+    public function applyAdminEdit(array $validated): void
+    {
+        DB::transaction(function () use ($validated): void {
+            $this->clock_in = $this->keepSeconds($validated['new_clock_in'], [$this->clock_in]);
+            $this->clock_out = $this->keepSeconds($validated['new_clock_out'], [$this->clock_out]);
+            $this->comment = $validated['comment'];
+
+            $breakOuts = $validated['new_break_out'] ?? [];
+
+            $breaks = collect($validated['new_break_in'] ?? [])
+                ->map(fn (?string $breakIn, int $index): array => ['break_in' => $breakIn, 'break_out' => $breakOuts[$index] ?? null])
+                ->reject(fn (array $break): bool => blank($break['break_in']) && blank($break['break_out']))
+                ->values()
+                ->all();
+
+            $this->replaceBreaks($breaks);
+        });
+    }
+
+    /**
+     * 休憩の行を全部消して渡された行に置換し、計算し直す。直接修正と承認の両方から呼ぶ。
+     * 時と分が消す前の休憩の時刻と同じ時刻は、消す前の値（秒を含む）で作る。入りは消す前の入りと、戻りは消す前の戻りと比べる。
+     *
+     * @param  array<int, array{break_in: string, break_out: string|null}>  $breaks  作る休憩の行
+     * @return void 返す値はない（休憩の行と計算した値を保存する）
+     */
+    public function replaceBreaks(array $breaks): void
+    {
+        $oldBreaks = $this->breaks()->get();
+        $oldBreakIns = $oldBreaks->pluck('break_in')->all();
+        $oldBreakOuts = $oldBreaks->pluck('break_out')->all();
+
+        $this->breaks()->delete();
+
+        foreach ($breaks as $break) {
+            $this->breaks()->create([
+                'break_in' => $this->keepSeconds($break['break_in'], $oldBreakIns),
+                'break_out' => $this->keepSeconds($break['break_out'], $oldBreakOuts),
+            ]);
+        }
+
+        $this->recalculate();
+    }
+
+    /**
      * 渡されたユーザーと月について、月の全部の日の勤怠一覧の行を返す。勤怠のない日は、日付のほかを null にする。
      *
      * @param  User  $user  勤怠を読むユーザー
@@ -228,14 +280,16 @@ class AttendanceRecord extends Model
 
     /**
      * 勤怠詳細の画面に渡す値を返す。休憩は入りの早い順に、0からの連番で並べる。
+     * エラーで戻ったときに送った値を渡すと、備考の書き忘れだけで時刻を打ち直さないよう、時刻、休憩、備考を送った値に置き換える。
      *
+     * @param  array<string, mixed>  $oldInput  エラーで戻ったときに送った値（なければ空の配列で、勤怠の値のまま返す）
      * @return array<string, mixed> id、year、date、clock_in、clock_out、breaks、comment
      */
-    public function toDetailData(): array
+    public function toDetailData(array $oldInput = []): array
     {
         $date = Carbon::parse($this->date);
 
-        return [
+        $detail = [
             'id' => $this->id,
             'year' => $date->format('Y年'),
             'date' => $date->format('n月j日'),
@@ -251,6 +305,36 @@ class AttendanceRecord extends Model
                 ->all(),
             'comment' => $this->comment,
         ];
+
+        if ($oldInput === []) {
+            return $detail;
+        }
+
+        $breakIns = $oldInput['new_break_in'] ?? [];
+        $breakOuts = $oldInput['new_break_out'] ?? [];
+        $breaks = [];
+
+        // 送った行の番号を保ち、エラーの文言が同じ行に出るようにする
+        foreach (is_array($breakIns) ? $breakIns : [] as $index => $breakIn) {
+            $breaks[$index] = [
+                'break_in' => $breakIn,
+                'break_out' => is_array($breakOuts) ? ($breakOuts[$index] ?? null) : null,
+            ];
+        }
+
+        // 画面が最後に追加用の空の行を足すので、送った最後の行が両方空なら除き、空の行が2つ並ばないようにする
+        $lastIndex = array_key_last($breaks);
+
+        if ($lastIndex !== null && blank($breaks[$lastIndex]['break_in']) && blank($breaks[$lastIndex]['break_out'])) {
+            unset($breaks[$lastIndex]);
+        }
+
+        return array_merge($detail, [
+            'clock_in' => $oldInput['new_clock_in'] ?? null,
+            'clock_out' => $oldInput['new_clock_out'] ?? null,
+            'breaks' => $breaks,
+            'comment' => $oldInput['comment'] ?? null,
+        ]);
     }
 
     /**
@@ -296,6 +380,12 @@ class AttendanceRecord extends Model
     private function toHourMinuteText(int $minutes): string
     {
         return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+    }
+
+    private function keepSeconds(?string $sentTime, array $currentTimes): ?string
+    {
+        // 画面は分までしか入力できないので、時と分を変えていない時刻は、打刻で入った秒を消さないように今の値を使う
+        return collect($currentTimes)->first(fn (?string $currentTime): bool => $currentTime !== null && substr($currentTime, 0, 5) === $sentTime) ?? $sentTime;
     }
 
     private function toMinutes(string $time): int

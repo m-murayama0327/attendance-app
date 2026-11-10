@@ -75,8 +75,8 @@ class AttendanceController extends Controller
     }
 
     /**
-     * 勤怠詳細の画面を出す。他の人の勤怠なら 403 にする。勤怠がなければ、ルートモデルバインディングが 404 にする。
-     * 承認待ちの申請がなく、入力の誤りで戻ったときは、備考の書き忘れだけで時刻を打ち直さないよう、送った値で時刻、休憩、備考を置き換える。
+     * 一般ユーザーの勤怠詳細の画面を出す。他の人の勤怠なら 403 にする。勤怠がなければ、ルートモデルバインディングが 404 にする。
+     * 承認待ちの申請がなく、入力の誤りで戻ったときは、送った値で時刻、休憩、備考を置き換える。承認待ちの申請があるときは読み取り専用で出すので、送った値は使わない。
      *
      * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
      * @param  AttendanceRecord  $attendanceRecord  URL の id で読んだ勤怠
@@ -86,36 +86,9 @@ class AttendanceController extends Controller
     {
         $this->authorize('view', $attendanceRecord);
 
-        $detail = $attendanceRecord->toDetailData();
-        $detail['application'] = $attendanceRecord->pendingApplication();
-
-        if ($detail['application'] === null && $request->session()->hasOldInput()) {
-            $breakIns = $request->old('new_break_in', []);
-            $breakOuts = $request->old('new_break_out', []);
-            $breaks = [];
-
-            // 送った行の番号を保ち、エラーの文言が同じ行に出るようにする
-            foreach (is_array($breakIns) ? $breakIns : [] as $index => $breakIn) {
-                $breaks[$index] = [
-                    'break_in' => $breakIn,
-                    'break_out' => is_array($breakOuts) ? ($breakOuts[$index] ?? null) : null,
-                ];
-            }
-
-            // 画面が最後に追加用の空の行を足すので、送った最後の行が両方空なら除き、空の行が2つ並ばないようにする
-            $lastIndex = array_key_last($breaks);
-
-            if ($lastIndex !== null && blank($breaks[$lastIndex]['break_in']) && blank($breaks[$lastIndex]['break_out'])) {
-                unset($breaks[$lastIndex]);
-            }
-
-            $detail = array_merge($detail, [
-                'clock_in' => $request->old('new_clock_in'),
-                'clock_out' => $request->old('new_clock_out'),
-                'breaks' => $breaks,
-                'comment' => $request->old('comment'),
-            ]);
-        }
+        $application = $attendanceRecord->pendingApplication();
+        $detail = $attendanceRecord->toDetailData($application === null ? $request->session()->getOldInput() : []);
+        $detail['application'] = $application;
 
         return view('user.user-detail', [
             'data' => $detail,

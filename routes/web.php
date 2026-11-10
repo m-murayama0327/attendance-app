@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\HomeController;
+use App\Models\AttendanceRecord;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 
@@ -21,6 +24,10 @@ Route::get('/', HomeController::class);
 Route::get('/admin/login', [AuthenticatedSessionController::class, 'create'])->middleware('guest:web');
 Route::post('/admin/login', [AuthenticatedSessionController::class, 'store'])->middleware(['guest:web', 'throttle:login']);
 Route::post('/admin/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('admin');
+Route::middleware('admin')->group(function () {
+    Route::get('/admin/attendance/list', [AdminAttendanceController::class, 'index']);
+    Route::get('/admin/attendance/{attendanceRecord}', [AdminAttendanceController::class, 'show'])->whereNumber('attendanceRecord');
+});
 Route::middleware(['auth', 'general'])->group(function () {
     Route::get('/attendance', [AttendanceController::class, 'index']);
     Route::post('/attendance', [AttendanceController::class, 'store']);
@@ -29,7 +36,16 @@ Route::middleware(['auth', 'general'])->group(function () {
     Route::get('/application/{application}', [ApplicationController::class, 'show'])->whereNumber('application');
 });
 Route::middleware('auth')->group(function () {
-    Route::get('/attendance/{attendanceRecord}', [AttendanceController::class, 'show'])->whereNumber('attendanceRecord');
-    Route::post('/attendance/{attendanceRecord}', [AttendanceController::class, 'update'])->whereNumber('attendanceRecord');
+    // 提供された Blade が一般ユーザーと管理者で同じパスを使うので、ログインしている人の役割を見て呼ぶコントローラーを分ける
+    Route::get('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord): mixed {
+        $controller = $request->user()->admin_status ? AdminAttendanceController::class : AttendanceController::class;
+
+        return app()->call([app($controller), 'show'], ['attendanceRecord' => $attendanceRecord]);
+    })->whereNumber('attendanceRecord');
+    Route::post('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord): mixed {
+        $controller = $request->user()->admin_status ? AdminAttendanceController::class : AttendanceController::class;
+
+        return app()->call([app($controller), 'update'], ['attendanceRecord' => $attendanceRecord]);
+    })->whereNumber('attendanceRecord');
     Route::get('/stamp_correction_request/list', [ApplicationController::class, 'index']);
 });
