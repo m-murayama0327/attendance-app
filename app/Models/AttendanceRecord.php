@@ -160,33 +160,48 @@ class AttendanceRecord extends Model
     }
 
     /**
-     * 管理者の直接修正の値で、出勤、退勤、備考と休憩を書き換える。時と分を変えていない出勤と退勤は、今の値（秒を含む）を残す。
+     * 管理者の直接修正のフォームの値を、rewrite() が受け取る出勤、退勤、備考と休憩の行に組み直して渡す。
      * 入りと戻りが両方空の休憩の行は、追加用の空の行か消した休憩の行なので、休憩にしない。
      *
      * @param  array{new_clock_in: string, new_clock_out: string, new_break_in?: array<int, string|null>, new_break_out?: array<int, string|null>, comment: string}  $validated  バリデーションを通った入力
-     * @return void 返す値はない（書き換えた値と計算した値を、この勤怠に保存する）
+     * @return void 返す値はない（rewrite() が、書き換えた値と計算した値をこの勤怠に保存する）
      */
     public function applyAdminEdit(array $validated): void
     {
-        DB::transaction(function () use ($validated): void {
-            $this->clock_in = $this->keepSeconds($validated['new_clock_in'], [$this->clock_in]);
-            $this->clock_out = $this->keepSeconds($validated['new_clock_out'], [$this->clock_out]);
-            $this->comment = $validated['comment'];
+        $breakOuts = $validated['new_break_out'] ?? [];
 
-            $breakOuts = $validated['new_break_out'] ?? [];
+        $breaks = collect($validated['new_break_in'] ?? [])
+            ->map(fn (?string $breakIn, int $index): array => ['break_in' => $breakIn, 'break_out' => $breakOuts[$index] ?? null])
+            ->reject(fn (array $break): bool => blank($break['break_in']) && blank($break['break_out']))
+            ->values()
+            ->all();
 
-            $breaks = collect($validated['new_break_in'] ?? [])
-                ->map(fn (?string $breakIn, int $index): array => ['break_in' => $breakIn, 'break_out' => $breakOuts[$index] ?? null])
-                ->reject(fn (array $break): bool => blank($break['break_in']) && blank($break['break_out']))
-                ->values()
-                ->all();
+        $this->rewrite($validated['new_clock_in'], $validated['new_clock_out'], $validated['comment'], $breaks);
+    }
+
+    /**
+     * 渡された出勤、退勤、備考と休憩の行で、この勤怠を1つのトランザクションで書き換える。管理者の直接修正と修正申請の承認の両方から呼ぶ。
+     * 時と分を変えていない出勤と退勤は、今の値（秒を含む）を残す。休憩の秒は replaceBreaks() が残す。
+     *
+     * @param  string  $clockIn  書き換える出勤（例：09:00）
+     * @param  string  $clockOut  書き換える退勤（例：18:00）
+     * @param  string  $comment  書き換える備考
+     * @param  array<int, array{break_in: string, break_out: string|null}>  $breaks  作る休憩の行
+     * @return void 返す値はない（書き換えた値と計算した値を、この勤怠に保存する）
+     */
+    public function rewrite(string $clockIn, string $clockOut, string $comment, array $breaks): void
+    {
+        DB::transaction(function () use ($clockIn, $clockOut, $comment, $breaks): void {
+            $this->clock_in = $this->keepSeconds($clockIn, [$this->clock_in]);
+            $this->clock_out = $this->keepSeconds($clockOut, [$this->clock_out]);
+            $this->comment = $comment;
 
             $this->replaceBreaks($breaks);
         });
     }
 
     /**
-     * 休憩の行を全部消して渡された行に置換し、計算し直す。直接修正と承認の両方から呼ぶ。
+     * 休憩の行を全部消して渡された行に置換し、計算し直す。rewrite() から呼ぶ。
      * 時と分が消す前の休憩の時刻と同じ時刻は、消す前の値（秒を含む）で作る。入りは消す前の入りと、戻りは消す前の戻りと比べる。
      *
      * @param  array<int, array{break_in: string, break_out: string|null}>  $breaks  作る休憩の行

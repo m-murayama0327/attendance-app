@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ApplicationController as AdminApplicationController;
 use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\ApplicationController;
@@ -30,6 +31,8 @@ Route::middleware('admin')->group(function () {
     Route::get('/admin/attendance/staff/{id}', [AdminAttendanceController::class, 'staff'])->whereNumber('id');
     Route::get('/admin/attendance/{attendanceRecord}', [AdminAttendanceController::class, 'show'])->whereNumber('attendanceRecord');
     Route::get('/admin/staff/list', [StaffController::class, 'index']);
+    Route::get('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'show'])->whereNumber('attendance_correct_request_id');
+    Route::post('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'approve'])->whereNumber('attendance_correct_request_id');
 });
 Route::middleware(['auth', 'general'])->group(function () {
     Route::get('/attendance', [AttendanceController::class, 'index']);
@@ -50,5 +53,9 @@ Route::middleware('auth')->group(function () {
 
         return app()->call([app($controller), 'update'], ['attendanceRecord' => $attendanceRecord]);
     })->whereNumber('attendanceRecord');
-    Route::get('/stamp_correction_request/list', [ApplicationController::class, 'index']);
+    Route::get('/stamp_correction_request/list', function (Request $request): mixed {
+        $controller = $request->user()->admin_status ? AdminApplicationController::class : ApplicationController::class;
+
+        return app()->call([app($controller), 'index']);
+    });
 });
