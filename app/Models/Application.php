@@ -5,11 +5,13 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
+use Illuminate\Support\Facades\DB;
 
 class Application extends Model
 {
@@ -94,6 +96,18 @@ class Application extends Model
     }
 
     /**
+     * 管理者の申請一覧の画面に渡す、全ユーザーの申請を返す。申請日時の新しい順に並べ、申請した人と申請先の勤怠を一緒に読む。
+     *
+     * @return Collection<int, Application> 全ユーザーの申請
+     */
+    public static function allForAdminList(): Collection
+    {
+        return self::with('user', 'AttendanceRecord')
+            ->latestApplied()
+            ->get();
+    }
+
+    /**
      * 申請の詳細の画面に渡す値を返す。日付は勤怠から、時刻、休憩、備考は申請から作る。休憩は入りの早い順に、0からの連番で並べる。
      *
      * @return array<string, mixed> id（勤怠の id）、application、year、date、clock_in、clock_out、breaks、comment
@@ -117,6 +131,32 @@ class Application extends Model
                 ->all(),
             'comment' => $this->comment,
         ];
+    }
+
+    /**
+     * 修正申請を承認する。申請の出勤、退勤、備考と休憩で申請先の勤怠を書き換え、申請を承認済みにする。
+     * 勤怠の書き換えと申請の書き込みを1つのトランザクションにまとめ、どちらかが失敗したら両方を元に戻す。
+     *
+     * @return void 返す値はない（書き換えた勤怠と承認済みにした申請を保存する）
+     */
+    public function approve(): void
+    {
+        DB::transaction(function (): void {
+            $this->AttendanceRecord->rewrite(
+                $this->new_clock_in,
+                $this->new_clock_out,
+                $this->comment,
+                $this->proposalBreaks
+                    ->map(fn (ProposalBreak $break): array => [
+                        'break_in' => $break->formattedBreakIn(),
+                        'break_out' => $break->formattedBreakOut(),
+                    ])
+                    ->all(),
+            );
+
+            $this->is_approved = true;
+            $this->save();
+        });
     }
 
     /**
@@ -152,6 +192,32 @@ class Application extends Model
     {
         return Attribute::make(
             get: fn (string $value): string => substr($value, 0, 5),
+        );
+    }
+
+    /**
+     * 申請先の勤怠の日付を Carbon で返すアクセサ。new_date の名前で読む。
+     * 申請の日付は勤怠詳細の画面で書き換えられず、申請先の勤怠の日付と同じなので、カラムを置かずに勤怠から作る。
+     *
+     * @return Attribute<Carbon, never> 申請の日付
+     */
+    protected function newDate(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): Carbon => Carbon::parse($this->AttendanceRecord->date),
+        );
+    }
+
+    /**
+     * 申請日時を返すアクセサ。application_date の名前で読む。
+     * 申請の行を作った日時が申請日時なので、created_at を返す。
+     *
+     * @return Attribute<Carbon, never> 申請日時
+     */
+    protected function applicationDate(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): Carbon => $this->created_at,
         );
     }
 }
