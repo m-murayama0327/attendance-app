@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ApplicationController as AdminApplicationController;
 use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\ApplicationController;
@@ -50,5 +51,9 @@ Route::middleware('auth')->group(function () {
 
         return app()->call([app($controller), 'update'], ['attendanceRecord' => $attendanceRecord]);
     })->whereNumber('attendanceRecord');
-    Route::get('/stamp_correction_request/list', [ApplicationController::class, 'index']);
+    Route::get('/stamp_correction_request/list', function (Request $request): mixed {
+        $controller = $request->user()->admin_status ? AdminApplicationController::class : ApplicationController::class;
+
+        return app()->call([app($controller), 'index']);
+    });
 });
