@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\Application;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Request;
@@ -21,9 +22,14 @@ class RouteServiceProvider extends ServiceProvider
 
     /**
      * Define your route model bindings, pattern filters, and other route configuration.
+     * 要件の承認のルートのパラメーターの名前（attendance_correct_request_id）はコントローラーの引数の名前と違うため、この名前のパラメーターを申請として読む決まりを足す。
+     *
+     * @return void 返す値はない
      */
     public function boot(): void
     {
+        Route::model('attendance_correct_request_id', Application::class);
+
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });

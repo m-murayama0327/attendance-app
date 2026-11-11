@@ -31,6 +31,8 @@ Route::middleware('admin')->group(function () {
     Route::get('/admin/attendance/staff/{id}', [AdminAttendanceController::class, 'staff'])->whereNumber('id');
     Route::get('/admin/attendance/{attendanceRecord}', [AdminAttendanceController::class, 'show'])->whereNumber('attendanceRecord');
     Route::get('/admin/staff/list', [StaffController::class, 'index']);
+    Route::get('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'show'])->whereNumber('attendance_correct_request_id');
+    Route::post('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'approve'])->whereNumber('attendance_correct_request_id');
 });
 Route::middleware(['auth', 'general'])->group(function () {
     Route::get('/attendance', [AttendanceController::class, 'index']);
