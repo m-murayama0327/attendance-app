@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('attendance_records', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('user_id')->constrained();
+            $table->foreignId('user_id')->constrained()->restrictOnDelete();
             $table->date('date');
             $table->time('clock_in');
             $table->time('clock_out')->nullable();
