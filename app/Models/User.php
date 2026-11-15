@@ -99,6 +99,30 @@ class User extends Authenticatable
     }
 
     /**
+     * 今日の勤怠と休憩から、勤務外、出勤中、休憩中、退勤済のどれかを返す。
+     * 打刻の状態の表示と打刻の処理が、同じ決め方を使うためのメソッド。
+     *
+     * @param  AttendanceRecord|null  $attendanceRecord  今日の勤怠（今日の行がなければ null）
+     * @return string 打刻の状態の文字（STATUS_ で始まる定数のどれか）
+     */
+    public static function resolveAttendanceStatus(?AttendanceRecord $attendanceRecord): string
+    {
+        if ($attendanceRecord === null) {
+            return self::STATUS_OFF_DUTY;
+        }
+
+        if ($attendanceRecord->clock_out !== null) {
+            return self::STATUS_FINISHED;
+        }
+
+        if ($attendanceRecord->breaks()->open()->exists()) {
+            return self::STATUS_ON_BREAK;
+        }
+
+        return self::STATUS_WORKING;
+    }
+
+    /**
      * 今日の勤怠と休憩から、勤務外、出勤中、休憩中、退勤済のどれかを返す（`$user->attendance_status` で読む）。
      * 打刻の直後に古い状態を出さないよう、読むたびにデータベースを読む。
      *
@@ -106,22 +130,6 @@ class User extends Authenticatable
      */
     protected function attendanceStatus(): Attribute
     {
-        return Attribute::get(function (): string {
-            $attendanceRecord = $this->findTodayAttendanceRecord();
-
-            if ($attendanceRecord === null) {
-                return self::STATUS_OFF_DUTY;
-            }
-
-            if ($attendanceRecord->clock_out !== null) {
-                return self::STATUS_FINISHED;
-            }
-
-            if ($attendanceRecord->breaks()->open()->exists()) {
-                return self::STATUS_ON_BREAK;
-            }
-
-            return self::STATUS_WORKING;
-        });
+        return Attribute::get(fn (): string => self::resolveAttendanceStatus($this->findTodayAttendanceRecord()));
     }
 }

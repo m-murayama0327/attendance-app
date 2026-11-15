@@ -58,8 +58,8 @@ class AttendanceController extends Controller
         $action = $request->validated('action');
 
         DB::transaction(function () use ($user, $action): void {
-            $status = $user->attendance_status;
             $attendanceRecord = $user->findTodayAttendanceRecord();
+            $status = User::resolveAttendanceStatus($attendanceRecord);
 
             if ($action === AttendanceRecord::ACTION_CLOCK_IN && $status === User::STATUS_OFF_DUTY) {
                 AttendanceRecord::clockIn($user);
