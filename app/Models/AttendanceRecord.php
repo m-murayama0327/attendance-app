@@ -137,13 +137,20 @@ class AttendanceRecord extends Model
     }
 
     /**
-     * 今の時刻で退勤を打刻する。
+     * 今の時刻で退勤を打刻する。今の時刻が出勤と全く同じ秒なら、何も書かない。
      *
      * @return void 返す値はない（退勤の時刻と計算した値を、この勤怠に保存する）
      */
     public function clockOut(): void
     {
-        $this->clock_out = now()->toTimeString();
+        $now = now()->toTimeString();
+
+        // 出勤と全く同じ秒の退勤は長さ0秒の勤務になり、実際の勤務ではないので書かない
+        if ($now === $this->clock_in) {
+            return;
+        }
+
+        $this->clock_out = $now;
         $this->recalculate();
     }
 
@@ -159,13 +166,21 @@ class AttendanceRecord extends Model
     }
 
     /**
-     * 今の時刻で休憩戻を打刻し、戻りのない休憩のうち最新の1行に戻りの時刻を書く。
+     * 今の時刻で休憩戻を打刻し、戻りのない休憩のうち最新の1行に戻りの時刻を書く。今の時刻がその休憩の入りと全く同じ秒なら、何も書かない。
      *
      * @return void 返す値はない（休憩の戻りと計算した値を保存する）
      */
     public function breakOut(): void
     {
-        $this->breaks()->open()->latest('break_in')->first()->update(['break_out' => now()->toTimeString()]);
+        $openBreak = $this->breaks()->open()->latest('break_in')->first();
+        $now = now()->toTimeString();
+
+        // 休憩入と全く同じ秒の休憩戻は長さ0秒の休憩になり、実際の休憩ではないので書かない
+        if ($now === $openBreak->break_in) {
+            return;
+        }
+
+        $openBreak->update(['break_out' => $now]);
         $this->recalculate();
     }
 
