@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\TimeFormat;
 use Carbon\CarbonPeriod;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -327,21 +328,18 @@ class AttendanceRecord extends Model
      */
     public function toDetailData(array $oldInput = []): array
     {
-        $date = Carbon::parse($this->date);
+        $detailDate = TimeFormat::toDetailDate($this->date);
 
         $detail = [
             'id' => $this->id,
-            'year' => $date->format('Y年'),
-            'date' => $date->format('n月j日'),
+            'year' => $detailDate['year'],
+            'date' => $detailDate['date'],
             'clock_in' => $this->formattedClockIn(),
             'clock_out' => $this->formattedClockOut(),
             'breaks' => $this->breaks()
                 ->orderBy('break_in')
                 ->get()
-                ->map(fn (AttendanceBreak $break): array => [
-                    'break_in' => $break->formattedBreakIn(),
-                    'break_out' => $break->formattedBreakOut(),
-                ])
+                ->map(fn (AttendanceBreak $break): array => $break->toBreakRow())
                 ->all(),
             'comment' => $this->comment,
         ];
@@ -384,7 +382,7 @@ class AttendanceRecord extends Model
      */
     public function formattedClockIn(): string
     {
-        return substr($this->clock_in, 0, 5);
+        return TimeFormat::toHourMinute($this->clock_in);
     }
 
     /**
@@ -394,7 +392,7 @@ class AttendanceRecord extends Model
      */
     public function formattedClockOut(): ?string
     {
-        return $this->clock_out === null ? null : substr($this->clock_out, 0, 5);
+        return TimeFormat::toHourMinute($this->clock_out);
     }
 
     /**
@@ -425,7 +423,7 @@ class AttendanceRecord extends Model
     private function keepSeconds(?string $sentTime, array $currentTimes): ?string
     {
         // 画面は分までしか入力できないので、時と分を変えていない時刻は、打刻で入った秒を消さないように今の値を使う
-        return collect($currentTimes)->first(fn (?string $currentTime): bool => $currentTime !== null && substr($currentTime, 0, 5) === $sentTime) ?? $sentTime;
+        return collect($currentTimes)->first(fn (?string $currentTime): bool => $currentTime !== null && TimeFormat::toHourMinute($currentTime) === $sentTime) ?? $sentTime;
     }
 
     private function toMinutes(string $time): int

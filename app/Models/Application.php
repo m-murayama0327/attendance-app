@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\TimeFormat;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -114,20 +115,17 @@ class Application extends Model
      */
     public function toDetailData(): array
     {
-        $date = Carbon::parse($this->AttendanceRecord->date);
+        $detailDate = TimeFormat::toDetailDate($this->AttendanceRecord->date);
 
         return [
             'id' => $this->attendance_record_id,
             'application' => $this,
-            'year' => $date->format('Y年'),
-            'date' => $date->format('n月j日'),
+            'year' => $detailDate['year'],
+            'date' => $detailDate['date'],
             'clock_in' => $this->new_clock_in,
             'clock_out' => $this->new_clock_out,
             'breaks' => $this->proposalBreaks
-                ->map(fn (ProposalBreak $break): array => [
-                    'break_in' => $break->formattedBreakIn(),
-                    'break_out' => $break->formattedBreakOut(),
-                ])
+                ->map(fn (ProposalBreak $break): array => $break->toBreakRow())
                 ->all(),
             'comment' => $this->comment,
         ];
@@ -147,10 +145,7 @@ class Application extends Model
                 $this->new_clock_out,
                 $this->comment,
                 $this->proposalBreaks
-                    ->map(fn (ProposalBreak $break): array => [
-                        'break_in' => $break->formattedBreakIn(),
-                        'break_out' => $break->formattedBreakOut(),
-                    ])
+                    ->map(fn (ProposalBreak $break): array => $break->toBreakRow())
                     ->all(),
             );
 
@@ -179,7 +174,7 @@ class Application extends Model
     protected function newClockIn(): Attribute
     {
         return Attribute::make(
-            get: fn (string $value): string => substr($value, 0, 5),
+            get: fn (string $value): string => TimeFormat::toHourMinute($value),
         );
     }
 
@@ -191,7 +186,7 @@ class Application extends Model
     protected function newClockOut(): Attribute
     {
         return Attribute::make(
-            get: fn (string $value): string => substr($value, 0, 5),
+            get: fn (string $value): string => TimeFormat::toHourMinute($value),
         );
     }
 
