@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AttendanceBreak extends Model
 {
@@ -18,16 +17,6 @@ class AttendanceBreak extends Model
         'break_in',
         'break_out',
     ];
-
-    /**
-     * この休憩の勤怠を返す。
-     *
-     * @return BelongsTo この休憩の勤怠
-     */
-    public function attendanceRecord(): BelongsTo
-    {
-        return $this->belongsTo(AttendanceRecord::class);
-    }
 
     /**
      * 休憩の入りを H:i の文字で返す。
