@@ -25,17 +25,17 @@ class AttendanceRecordSeeder extends Seeder
                     continue;
                 }
 
-                $record = AttendanceRecord::create([
+                $attendanceRecord = AttendanceRecord::create([
                     'user_id' => $user->id,
                     'date' => $date->toDateString(),
                     'clock_in' => '09:00:00',
                     'clock_out' => '18:00:00',
                 ]);
-                $record->breaks()->create([
+                $attendanceRecord->breaks()->create([
                     'break_in' => '12:00:00',
                     'break_out' => '13:00:00',
                 ]);
-                $record->recalculate();
+                $attendanceRecord->recalculate();
             }
         }
     }

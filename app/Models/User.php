@@ -98,17 +98,17 @@ class User extends Authenticatable
     protected function attendanceStatus(): Attribute
     {
         return Attribute::get(function (): string {
-            $record = $this->findTodayAttendanceRecord();
+            $attendanceRecord = $this->findTodayAttendanceRecord();
 
-            if ($record === null) {
+            if ($attendanceRecord === null) {
                 return '勤務外';
             }
 
-            if ($record->clock_out !== null) {
+            if ($attendanceRecord->clock_out !== null) {
                 return '退勤済';
             }
 
-            if ($record->breaks()->whereNull('break_out')->exists()) {
+            if ($attendanceRecord->breaks()->whereNull('break_out')->exists()) {
                 return '休憩中';
             }
 

@@ -58,16 +58,16 @@ class AttendanceController extends Controller
 
         DB::transaction(function () use ($user, $action): void {
             $status = $user->attendance_status;
-            $record = $user->findTodayAttendanceRecord();
+            $attendanceRecord = $user->findTodayAttendanceRecord();
 
             if ($action === 'clock_in' && $status === '勤務外') {
                 AttendanceRecord::clockIn($user);
             } elseif ($action === 'clock_out' && $status === '出勤中') {
-                $record->clockOut();
+                $attendanceRecord->clockOut();
             } elseif ($action === 'break_in' && $status === '出勤中') {
-                $record->breakIn();
+                $attendanceRecord->breakIn();
             } elseif ($action === 'break_out' && $status === '休憩中') {
-                $record->breakOut();
+                $attendanceRecord->breakOut();
             }
         });
 

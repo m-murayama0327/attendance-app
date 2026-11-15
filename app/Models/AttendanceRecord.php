@@ -114,16 +114,16 @@ class AttendanceRecord extends Model
      */
     public static function clockIn(User $user): self
     {
-        $record = self::createOrFirst(
+        $attendanceRecord = self::createOrFirst(
             ['user_id' => $user->id, 'date' => today()->toDateString()],
             ['clock_in' => now()->toTimeString()],
         );
 
-        if ($record->wasRecentlyCreated) {
-            $record->recalculate();
+        if ($attendanceRecord->wasRecentlyCreated) {
+            $attendanceRecord->recalculate();
         }
 
-        return $record;
+        return $attendanceRecord;
     }
 
     /**
@@ -237,22 +237,22 @@ class AttendanceRecord extends Model
         $start = $month->copy()->startOfMonth();
         $end = $month->copy()->endOfMonth();
 
-        $records = self::where('user_id', $user->id)
+        $attendanceRecords = self::where('user_id', $user->id)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->get()
             ->keyBy('date');
 
         return collect(CarbonPeriod::create($start, $end))
-            ->map(function (Carbon $day) use ($records): array {
-                $record = $records->get($day->toDateString());
+            ->map(function (Carbon $day) use ($attendanceRecords): array {
+                $attendanceRecord = $attendanceRecords->get($day->toDateString());
 
                 return [
                     'date' => $day->isoFormat('MM/DD(ddd)'),
-                    'clock_in' => $record?->formattedClockIn(),
-                    'clock_out' => $record?->formattedClockOut(),
-                    'total_break_time' => $record?->total_break_time,
-                    'total_time' => $record?->total_time,
-                    'id' => $record?->id,
+                    'clock_in' => $attendanceRecord?->formattedClockIn(),
+                    'clock_out' => $attendanceRecord?->formattedClockOut(),
+                    'total_break_time' => $attendanceRecord?->total_break_time,
+                    'total_time' => $attendanceRecord?->total_time,
+                    'id' => $attendanceRecord?->id,
                 ];
             })
             ->all();
