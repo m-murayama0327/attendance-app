@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -17,6 +18,17 @@ class AttendanceBreak extends Model
         'break_in',
         'break_out',
     ];
+
+    /**
+     * 戻りのない休憩（今とっている休憩）だけに絞る。
+     *
+     * @param  Builder<AttendanceBreak>  $query  絞る前の休憩のクエリ
+     * @return void 返す値はない
+     */
+    public function scopeOpen(Builder $query): void
+    {
+        $query->whereNull('break_out');
+    }
 
     /**
      * 休憩の入りを H:i の文字で返す。

@@ -117,7 +117,7 @@ class User extends Authenticatable
                 return self::STATUS_FINISHED;
             }
 
-            if ($attendanceRecord->breaks()->whereNull('break_out')->exists()) {
+            if ($attendanceRecord->breaks()->open()->exists()) {
                 return self::STATUS_ON_BREAK;
             }
 

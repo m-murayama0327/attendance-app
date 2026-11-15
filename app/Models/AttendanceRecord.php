@@ -165,7 +165,7 @@ class AttendanceRecord extends Model
      */
     public function breakOut(): void
     {
-        $this->breaks()->whereNull('break_out')->latest('break_in')->first()->update(['break_out' => now()->toTimeString()]);
+        $this->breaks()->open()->latest('break_in')->first()->update(['break_out' => now()->toTimeString()]);
         $this->recalculate();
     }
 
