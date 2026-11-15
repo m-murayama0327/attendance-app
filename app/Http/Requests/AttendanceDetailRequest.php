@@ -69,7 +69,7 @@ class AttendanceDetailRequest extends FormRequest
     }
 
     /**
-     * 入力の決まりに反したときの文言を返す。文言は機能要件の FN029 のものを使い、FN029 にない場合は自分で決めた文言にする。
+     * 入力の決まりに反したときの文言を返す。文言は要件の修正申請の文言を使い、要件にない場合は自分で決めた文言にする。
      *
      * @return array<string, string> 決まりごとの文言
      */

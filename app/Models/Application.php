@@ -108,7 +108,7 @@ class Application extends Model
     }
 
     /**
-     * 申請の詳細の画面に渡す値を返す。日付は勤怠から、時刻、休憩、備考は申請から作る。休憩は入りの早い順に、0からの連番で並べる。
+     * 申請詳細の画面に渡す値を返す。日付は勤怠から、時刻、休憩、備考は申請から作る。休憩は入りの早い順に、0からの連番で並べる。
      *
      * @return array<string, mixed> id（勤怠の id）、application、year、date、clock_in、clock_out、breaks、comment
      */
