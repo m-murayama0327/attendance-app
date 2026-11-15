@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AttendanceRecord;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\In;
 
 class StampRequest extends FormRequest
 {
@@ -19,12 +22,12 @@ class StampRequest extends FormRequest
     /**
      * 打刻の入力の決まりを返す。
      *
-     * @return array<string, array<int, string>> 入力項目ごとの決まり
+     * @return array<string, array<int, string|In>> 入力項目ごとの決まり
      */
     public function rules(): array
     {
         return [
-            'action' => ['required', 'in:clock_in,clock_out,break_in,break_out'],
+            'action' => ['required', Rule::in(AttendanceRecord::ACTIONS)],
         ];
     }
 }

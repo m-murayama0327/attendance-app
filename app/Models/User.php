@@ -15,6 +15,15 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    // 提供された Blade が打刻の状態をこの文字で比べるので、値の文字は変えない
+    public const STATUS_OFF_DUTY = '勤務外';
+
+    public const STATUS_WORKING = '出勤中';
+
+    public const STATUS_ON_BREAK = '休憩中';
+
+    public const STATUS_FINISHED = '退勤済';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -101,18 +110,18 @@ class User extends Authenticatable
             $attendanceRecord = $this->findTodayAttendanceRecord();
 
             if ($attendanceRecord === null) {
-                return '勤務外';
+                return self::STATUS_OFF_DUTY;
             }
 
             if ($attendanceRecord->clock_out !== null) {
-                return '退勤済';
+                return self::STATUS_FINISHED;
             }
 
             if ($attendanceRecord->breaks()->whereNull('break_out')->exists()) {
-                return '休憩中';
+                return self::STATUS_ON_BREAK;
             }
 
-            return '出勤中';
+            return self::STATUS_WORKING;
         });
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\AttendanceDetailRequest;
 use App\Http\Requests\StampRequest;
 use App\Models\AttendanceRecord;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,13 +61,13 @@ class AttendanceController extends Controller
             $status = $user->attendance_status;
             $attendanceRecord = $user->findTodayAttendanceRecord();
 
-            if ($action === 'clock_in' && $status === '勤務外') {
+            if ($action === AttendanceRecord::ACTION_CLOCK_IN && $status === User::STATUS_OFF_DUTY) {
                 AttendanceRecord::clockIn($user);
-            } elseif ($action === 'clock_out' && $status === '出勤中') {
+            } elseif ($action === AttendanceRecord::ACTION_CLOCK_OUT && $status === User::STATUS_WORKING) {
                 $attendanceRecord->clockOut();
-            } elseif ($action === 'break_in' && $status === '出勤中') {
+            } elseif ($action === AttendanceRecord::ACTION_BREAK_IN && $status === User::STATUS_WORKING) {
                 $attendanceRecord->breakIn();
-            } elseif ($action === 'break_out' && $status === '休憩中') {
+            } elseif ($action === AttendanceRecord::ACTION_BREAK_OUT && $status === User::STATUS_ON_BREAK) {
                 $attendanceRecord->breakOut();
             }
         });

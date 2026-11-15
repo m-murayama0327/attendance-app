@@ -16,6 +16,16 @@ class AttendanceRecord extends Model
 {
     use HasFactory;
 
+    public const ACTION_CLOCK_IN = 'clock_in';
+
+    public const ACTION_CLOCK_OUT = 'clock_out';
+
+    public const ACTION_BREAK_IN = 'break_in';
+
+    public const ACTION_BREAK_OUT = 'break_out';
+
+    public const ACTIONS = [self::ACTION_CLOCK_IN, self::ACTION_CLOCK_OUT, self::ACTION_BREAK_IN, self::ACTION_BREAK_OUT];
+
     private const START_TIME = '09:00';
 
     private const END_TIME = '18:00';
