@@ -80,7 +80,7 @@ class AttendanceRecord extends Model
         $breakMinutes = $this->breaks()
             ->whereNotNull('break_out')
             ->get()
-            ->sum(fn (AttendanceBreak $break) => $this->toMinutes($break->break_out) - $this->toMinutes($break->break_in));
+            ->sum(fn (AttendanceBreak $break): int => $this->toMinutes($break->break_out) - $this->toMinutes($break->break_in));
 
         $clockIn = $this->toMinutes($this->clock_in);
         $this->break_minutes = $breakMinutes;

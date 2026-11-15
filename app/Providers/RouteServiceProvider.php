@@ -30,11 +30,11 @@ class RouteServiceProvider extends ServiceProvider
     {
         Route::model('attendance_correct_request_id', Application::class);
 
-        RateLimiter::for('api', function (Request $request) {
+        RateLimiter::for('api', function (Request $request): Limit {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
-        $this->routes(function () {
+        $this->routes(function (): void {
             Route::middleware('api')
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));

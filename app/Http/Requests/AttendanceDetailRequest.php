@@ -52,8 +52,8 @@ class AttendanceDetailRequest extends FormRequest
 
             // 長い休憩の中に短い休憩が2つ入っても見逃さないよう、直前の休憩ではなく、それまでで一番遅い戻りと比べる
             $breaks = collect($this->input('new_break_in', []))
-                ->map(fn ($breakIn, $index) => ['index' => $index, 'in' => $breakIn, 'out' => $this->input("new_break_out.{$index}")])
-                ->filter(fn (array $break) => filled($break['in']) && filled($break['out']))
+                ->map(fn (?string $breakIn, int|string $index): array => ['index' => $index, 'in' => $breakIn, 'out' => $this->input("new_break_out.{$index}")])
+                ->filter(fn (array $break): bool => filled($break['in']) && filled($break['out']))
                 ->sortBy('in');
 
             $latestOut = null;

@@ -56,7 +56,7 @@ class AttendanceController extends Controller
         $user = $request->user();
         $action = $request->validated('action');
 
-        DB::transaction(function () use ($user, $action) {
+        DB::transaction(function () use ($user, $action): void {
             $status = $user->attendance_status;
             $record = $user->findTodayAttendanceRecord();
 

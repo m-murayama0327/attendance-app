@@ -26,7 +26,7 @@ Route::get('/', HomeController::class);
 Route::get('/admin/login', [AuthenticatedSessionController::class, 'create'])->middleware('guest:web');
 Route::post('/admin/login', [AuthenticatedSessionController::class, 'store'])->middleware(['guest:web', 'throttle:login']);
 Route::post('/admin/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('admin');
-Route::middleware('admin')->group(function () {
+Route::middleware('admin')->group(function (): void {
     Route::get('/admin/attendance/list', [AdminAttendanceController::class, 'index']);
     Route::get('/admin/attendance/staff/{id}', [AdminAttendanceController::class, 'staff'])->whereNumber('id');
     Route::get('/admin/attendance/{attendanceRecord}', [AdminAttendanceController::class, 'show'])->whereNumber('attendanceRecord');
@@ -34,14 +34,14 @@ Route::middleware('admin')->group(function () {
     Route::get('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'show'])->whereNumber('attendance_correct_request_id');
     Route::post('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'approve'])->whereNumber('attendance_correct_request_id');
 });
-Route::middleware(['auth', 'general'])->group(function () {
+Route::middleware(['auth', 'general'])->group(function (): void {
     Route::get('/attendance', [AttendanceController::class, 'index']);
     Route::post('/attendance', [AttendanceController::class, 'store']);
     Route::get('/attendance/list', [AttendanceController::class, 'list']);
     Route::get('/attendance/detail/{attendanceRecord}', [AttendanceController::class, 'show'])->whereNumber('attendanceRecord');
     Route::get('/application/{application}', [ApplicationController::class, 'show'])->whereNumber('application');
 });
-Route::middleware('auth')->group(function () {
+Route::middleware('auth')->group(function (): void {
     // 提供された Blade が一般ユーザーと管理者で同じパスを使うので、ログインしている人の役割を見て呼ぶコントローラーを分ける
     Route::get('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord): mixed {
         $controller = $request->user()->admin_status ? AdminAttendanceController::class : AttendanceController::class;
