@@ -26,4 +26,10 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    // 提供された CSS の絵（/images/...）は、開発用のサーバー（5173番）から読みに行くので、絵がある Laravel（80番）へ回す
+    server: {
+        proxy: {
+            "/images": "http://localhost",
+        },
+    },
 });
