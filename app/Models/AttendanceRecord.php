@@ -286,12 +286,14 @@ class AttendanceRecord extends Model
 
         $this->breaks()->delete();
 
-        foreach ($breaks as $break) {
-            $this->breaks()->create([
-                'break_in' => $this->keepSeconds($break['break_in'], $oldBreakIns),
-                'break_out' => $this->keepSeconds($break['break_out'], $oldBreakOuts),
-            ]);
-        }
+        $this->breaks()->createMany(
+            collect($breaks)
+                ->map(fn (array $break): array => [
+                    'break_in' => $this->keepSeconds($break['break_in'], $oldBreakIns),
+                    'break_out' => $this->keepSeconds($break['break_out'], $oldBreakOuts),
+                ])
+                ->all(),
+        );
 
         $this->recalculate();
     }
@@ -429,15 +431,14 @@ class AttendanceRecord extends Model
 
         $breakIns = $oldInput['new_break_in'] ?? [];
         $breakOuts = $oldInput['new_break_out'] ?? [];
-        $breaks = [];
 
-        // 送った行の番号を保ち、エラーの文言が同じ行に出るようにする
-        foreach (is_array($breakIns) ? $breakIns : [] as $index => $breakIn) {
-            $breaks[$index] = [
+        // map() はキーを保つので、送った行の番号のまま並び、エラーの文言が同じ行に出る
+        $breaks = collect(is_array($breakIns) ? $breakIns : [])
+            ->map(fn (mixed $breakIn, int|string $index): array => [
                 'break_in' => $breakIn,
                 'break_out' => is_array($breakOuts) ? ($breakOuts[$index] ?? null) : null,
-            ];
-        }
+            ])
+            ->all();
 
         // 画面が最後に追加用の空の行を足すので、送った最後の行が両方空なら除き、空の行が2つ並ばないようにする
         $lastIndex = array_key_last($breaks);

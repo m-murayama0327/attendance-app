@@ -130,7 +130,7 @@ class AttendanceController extends Controller
     private function renderDetail(Request $request, AttendanceRecord $attendanceRecord): View
     {
         return view('admin.admin-detail', [
-            'attendanceRecord' => $attendanceRecord->toDetailData($request->session()->getOldInput()),
+            'attendanceRecord' => $attendanceRecord->toDetailData($request->old()),
             'user' => $attendanceRecord->user,
         ]);
     }

@@ -154,7 +154,7 @@ class AttendanceController extends Controller
     {
         // 承認待ちの申請があるときは読み取り専用で出すので、エラーで戻ったときに送った値は使わない
         $application = $attendanceRecord->pendingApplication();
-        $detail = $attendanceRecord->toDetailData($application === null ? $request->session()->getOldInput() : []);
+        $detail = $attendanceRecord->toDetailData($application === null ? $request->old() : []);
         $detail['application'] = $application;
 
         return view('user.user-detail', [
