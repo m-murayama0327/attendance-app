@@ -186,21 +186,32 @@ class AttendanceRecord extends Model
     }
 
     /**
+     * 休憩の入りの配列と戻りの配列から、同じ番号どうしを組にした休憩の行を返す。
+     * 入りと戻りが両方空の行は、追加用の空の行か消した休憩の行なので、休憩にしない。修正申請と管理者の直接修正で、休憩にする行の決まりをそろえるため、この1か所にまとめる。
+     *
+     * @param  array<int|string, string|null>  $breakIns  休憩の入りの配列（フォームの new_break_in）
+     * @param  array<int|string, string|null>  $breakOuts  休憩の戻りの配列（フォームの new_break_out）
+     * @return array<int, array{break_in: string|null, break_out: string|null}> 休憩の行（0からの連番）
+     */
+    public static function toBreakRows(array $breakIns, array $breakOuts): array
+    {
+        return collect($breakIns)
+            ->map(fn (?string $breakIn, int|string $index): array => ['break_in' => $breakIn, 'break_out' => $breakOuts[$index] ?? null])
+            ->reject(fn (array $break): bool => blank($break['break_in']) && blank($break['break_out']))
+            ->values()
+            ->all();
+    }
+
+    /**
      * 管理者の直接修正のフォームの値を、rewrite() が受け取る出勤、退勤、備考と休憩の行に組み直して渡す。
-     * 入りと戻りが両方空の休憩の行は、追加用の空の行か消した休憩の行なので、休憩にしない。
+     * 入りと戻りが両方空の休憩の行は、toBreakRows() で除く。
      *
      * @param  array{new_clock_in: string, new_clock_out: string, new_break_in?: array<int, string|null>, new_break_out?: array<int, string|null>, comment: string}  $validated  バリデーションを通った入力
      * @return void 返す値はない（rewrite() が、書き換えた値と計算した値をこの勤怠に保存する）
      */
     public function applyAdminEdit(array $validated): void
     {
-        $breakOuts = $validated['new_break_out'] ?? [];
-
-        $breaks = collect($validated['new_break_in'] ?? [])
-            ->map(fn (?string $breakIn, int $index): array => ['break_in' => $breakIn, 'break_out' => $breakOuts[$index] ?? null])
-            ->reject(fn (array $break): bool => blank($break['break_in']) && blank($break['break_out']))
-            ->values()
-            ->all();
+        $breaks = self::toBreakRows($validated['new_break_in'] ?? [], $validated['new_break_out'] ?? []);
 
         $this->rewrite($validated['new_clock_in'], $validated['new_clock_out'], $validated['comment'], $breaks);
     }

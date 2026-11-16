@@ -118,21 +118,9 @@ class AttendanceController extends Controller
                 'comment' => $request->validated('comment'),
             ]);
 
-            $breakOuts = $request->validated('new_break_out', []);
-
-            foreach ($request->validated('new_break_in', []) as $index => $breakIn) {
-                $breakOut = $breakOuts[$index] ?? null;
-
-                // 入りと戻りが両方空の行は、追加用の空の行か、消した休憩の行なので、申請の休憩にしない
-                if (blank($breakIn) && blank($breakOut)) {
-                    continue;
-                }
-
-                $application->proposalBreaks()->create([
-                    'break_in' => $breakIn,
-                    'break_out' => $breakOut,
-                ]);
-            }
+            $application->proposalBreaks()->createMany(
+                AttendanceRecord::toBreakRows($request->validated('new_break_in', []), $request->validated('new_break_out', [])),
+            );
         });
 
         return redirect('/attendance/'.$attendanceRecord->id);
