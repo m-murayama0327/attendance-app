@@ -81,7 +81,6 @@
                         <label class="form__header">{{ $newBreakIndex === 0 ? '休憩' : '休憩' . ($newBreakIndex + 1) }}</label>
                         <div class="form__input-group">
                             <input class="form__input" type="text" name="new_break_in[{{ $newBreakIndex }}]" value="">
-                            <p>〜</p>
                             <input class="form__input" type="text" name="new_break_out[{{ $newBreakIndex }}]" value="">
                         </div>
                     </div>
