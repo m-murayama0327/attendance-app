@@ -58,9 +58,10 @@ class AttendanceDetailRequest extends FormRequest
 
             $latestOut = null;
 
+            // 一番遅い戻りを次の休憩に持ち越して比べる処理で、reduce() にすると持ち越す値とエラーを付ける処理が混ざって読みにくくなるため、foreach のままにする
             foreach ($breaks as $break) {
                 if ($latestOut !== null && $break['in'] < $latestOut) {
-                    $validator->errors()->add("new_break_in.{$break['index']}", '休憩時間が不適切な値です');
+                    $validator->errors()->add("new_break_in.{$break['index']}", $this->messages()['new_break_in.*.after_or_equal']);
                 }
 
                 $latestOut = max($latestOut ?? $break['out'], $break['out']);
