@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -69,13 +68,12 @@ class User extends Authenticatable
 
     /**
      * このユーザーの修正申請を返す。
-     * 申請は user_id を持たないため、このユーザーの勤怠を通して読む。
      *
-     * @return HasManyThrough このユーザーの修正申請の一覧
+     * @return HasMany このユーザーの修正申請の一覧
      */
-    public function applications(): HasManyThrough
+    public function applications(): HasMany
     {
-        return $this->hasManyThrough(Application::class, AttendanceRecord::class);
+        return $this->hasMany(Application::class);
     }
 
     /**

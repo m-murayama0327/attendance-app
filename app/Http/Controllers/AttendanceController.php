@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\AttendanceDetailRequest;
 use App\Http\Requests\StampRequest;
+use App\Models\Application;
 use App\Models\AttendanceRecord;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -112,7 +113,9 @@ class AttendanceController extends Controller
         }
 
         DB::transaction(function () use ($request, $attendanceRecord): void {
-            $application = $attendanceRecord->applications()->create([
+            $application = Application::create([
+                'user_id' => $attendanceRecord->user_id,
+                'date' => $attendanceRecord->date,
                 'new_clock_in' => $request->validated('new_clock_in'),
                 'new_clock_out' => $request->validated('new_clock_out'),
                 'comment' => $request->validated('comment'),

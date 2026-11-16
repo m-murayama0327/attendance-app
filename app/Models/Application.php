@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Support\Facades\DB;
 
 class Application extends Model
@@ -19,7 +18,8 @@ class Application extends Model
     use HasFactory;
 
     protected $fillable = [
-        'attendance_record_id',
+        'user_id',
+        'date',
         'new_clock_in',
         'new_clock_out',
         'comment',
@@ -30,25 +30,26 @@ class Application extends Model
     ];
 
     /**
-     * この申請の勤怠の持ち主のユーザーを返す。
-     * 申請は user_id を持たないため、勤怠を通して読む。
+     * この申請をした人を返す。
      *
-     * @return HasOneThrough この申請の勤怠の持ち主のユーザー
+     * @return BelongsTo この申請をした人
      */
-    public function user(): HasOneThrough
+    public function user(): BelongsTo
     {
-        return $this->hasOneThrough(User::class, AttendanceRecord::class, 'id', 'id', 'attendance_record_id', 'user_id');
+        return $this->belongsTo(User::class);
     }
 
     /**
-     * この申請の勤怠を返す。
-     * 提供された Blade が $application->AttendanceRecord の名前で読むため、名前を大文字で始める。
+     * この申請と同じ人と日付の勤怠を返す。なければ null を返す。
+     * 申請は勤怠がない日にも出せるように勤怠の番号を持たず、人と日付で勤怠とつながるので、リレーションではなく探して読む。
      *
-     * @return BelongsTo この申請の勤怠
+     * @return AttendanceRecord|null この申請と同じ人と日付の勤怠
      */
-    public function AttendanceRecord(): BelongsTo
+    public function findAttendanceRecord(): ?AttendanceRecord
     {
-        return $this->belongsTo(AttendanceRecord::class);
+        return AttendanceRecord::where('user_id', $this->user_id)
+            ->where('date', $this->date)
+            ->first();
     }
 
     /**
@@ -63,15 +64,14 @@ class Application extends Model
 
     /**
      * 申請日時の新しい順に並べ、同じ日時は id の大きい順にして、並びを1通りにする。
-     * 勤怠を通して申請を読むときは勤怠のテーブルにも同じ名前のカラムがあるので、申請のテーブルの名前を付けて並べる。
      *
      * @param  Builder<Application>  $query  並べる前の申請のクエリ
      * @return void 返す値はない
      */
     public function scopeLatestApplied(Builder $query): void
     {
-        $query->orderByDesc($query->qualifyColumn('created_at'))
-            ->orderByDesc($query->qualifyColumn('id'));
+        $query->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     /**
@@ -83,12 +83,11 @@ class Application extends Model
     public static function listRowsFor(User $user): array
     {
         return $user->applications()
-            ->with('AttendanceRecord')
             ->latestApplied()
             ->get()
             ->map(fn (Application $application): array => [
                 'approval_status' => $application->approval_status,
-                'date' => Carbon::parse($application->AttendanceRecord->date)->format('Y/m/d'),
+                'date' => Carbon::parse($application->date)->format('Y/m/d'),
                 'application_date' => $application->created_at->format('Y/m/d'),
                 'comment' => $application->comment,
                 'id' => $application->id,
@@ -97,28 +96,28 @@ class Application extends Model
     }
 
     /**
-     * 管理者の申請一覧の画面に渡す、全ユーザーの申請を返す。申請日時の新しい順に並べ、申請した人と申請先の勤怠を一緒に読む。
+     * 管理者の申請一覧の画面に渡す、全ユーザーの申請を返す。申請日時の新しい順に並べ、申請した人を一緒に読む。
      *
      * @return Collection<int, Application> 全ユーザーの申請
      */
     public static function allForAdminList(): Collection
     {
-        return self::with('user', 'AttendanceRecord')
+        return self::with('user')
             ->latestApplied()
             ->get();
     }
 
     /**
-     * 申請詳細の画面に渡す値を返す。日付は勤怠から、時刻、休憩、備考は申請から作る。休憩は入りの早い順に、0からの連番で並べる。
+     * 申請詳細の画面に渡す値を返す。日付、時刻、休憩、備考は申請から作る。休憩は入りの早い順に、0からの連番で並べる。
      *
-     * @return array<string, mixed> id（勤怠の id）、application、year、date、clock_in、clock_out、breaks、comment
+     * @return array<string, mixed> id（同じ人と日付の勤怠の id。勤怠がなければ null）、application、year、date、clock_in、clock_out、breaks、comment
      */
     public function toDetailData(): array
     {
-        $detailDate = TimeFormat::toDetailDate($this->AttendanceRecord->date);
+        $detailDate = TimeFormat::toDetailDate($this->date);
 
         return [
-            'id' => $this->attendance_record_id,
+            'id' => $this->findAttendanceRecord()?->id,
             'application' => $this,
             'year' => $detailDate['year'],
             'date' => $detailDate['date'],
@@ -140,7 +139,7 @@ class Application extends Model
     public function approve(): void
     {
         DB::transaction(function (): void {
-            $this->AttendanceRecord->rewrite(
+            $this->findAttendanceRecord()->rewrite(
                 $this->new_clock_in,
                 $this->new_clock_out,
                 $this->comment,
@@ -191,15 +190,15 @@ class Application extends Model
     }
 
     /**
-     * 申請先の勤怠の日付を Carbon で返すアクセサ。new_date の名前で読む。
-     * 申請の日付は勤怠詳細の画面で書き換えられず、申請先の勤怠の日付と同じなので、カラムを置かずに勤怠から作る。
+     * 申請の日付を Carbon で返すアクセサ。new_date の名前で読む。
+     * 提供された Blade が申請の日付を new_date の名前で読み、日付を書き分けるので、date のカラムから Carbon にして返す。
      *
      * @return Attribute<Carbon, never> 申請の日付
      */
     protected function newDate(): Attribute
     {
         return Attribute::make(
-            get: fn (): Carbon => Carbon::parse($this->AttendanceRecord->date),
+            get: fn (): Carbon => Carbon::parse($this->date),
         );
     }
 

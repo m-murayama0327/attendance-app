@@ -35,7 +35,7 @@ class ApplicationController extends Controller
 
         return view('user.user-detail', [
             'data' => $application->toDetailData(),
-            'user' => $application->AttendanceRecord->user,
+            'user' => $application->user,
         ]);
     }
 }

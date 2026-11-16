@@ -15,7 +15,8 @@ return new class extends Migration
     {
         Schema::create('applications', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('attendance_record_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->restrictOnDelete();
+            $table->date('date');
             $table->time('new_clock_in');
             $table->time('new_clock_out');
             $table->string('comment');

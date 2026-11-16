@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\TimeFormat;
 use Carbon\CarbonPeriod;
 use Carbon\Exceptions\InvalidFormatException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -49,6 +50,14 @@ class AttendanceRecord extends Model
         'is_long_work' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        // 申請は勤怠の番号を持たず、データベースの外部キーでは勤怠と一緒に消えないので、勤怠を消すときに同じ人と日付の申請も消す。申請の休憩は、申請への外部キーで一緒に消える
+        static::deleting(function (AttendanceRecord $attendanceRecord): void {
+            $attendanceRecord->sameDayApplications()->delete();
+        });
+    }
+
     /**
      * この勤怠のユーザーを返す。
      *
@@ -70,13 +79,16 @@ class AttendanceRecord extends Model
     }
 
     /**
-     * この勤怠への修正申請を返す。
+     * この勤怠と同じ人と日付の修正申請を読むクエリを返す。
+     * 申請は勤怠がない日にも出せるように勤怠の番号を持たず、人と日付で勤怠とつながるので、リレーションではなく人と日付で探す。
      *
-     * @return HasMany この勤怠への修正申請の一覧
+     * @return Builder<Application> 同じ人と日付の修正申請を読むクエリ
      */
-    public function applications(): HasMany
+    public function sameDayApplications(): Builder
     {
-        return $this->hasMany(Application::class);
+        return Application::query()
+            ->where('user_id', $this->user_id)
+            ->where('date', $this->date);
     }
 
     /**
@@ -332,13 +344,13 @@ class AttendanceRecord extends Model
     }
 
     /**
-     * この勤怠への承認待ちの修正申請を返す。なければ null を返す。
+     * この勤怠と同じ人と日付の、承認待ちの修正申請を返す。なければ null を返す。
      *
      * @return Application|null 承認待ちの修正申請
      */
     public function pendingApplication(): ?Application
     {
-        return $this->applications()->where('is_approved', false)->first();
+        return $this->sameDayApplications()->where('is_approved', false)->first();
     }
 
     /**
