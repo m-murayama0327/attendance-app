@@ -78,7 +78,11 @@
             <td class="table__description">
                 <p class="table__description--item"></p>
             </td>
-            <td class="table__description"></td>
+            <td class="table__description">
+                @if ($date->isBefore(today()))
+                <a class="table__item--detail-link" href="{{ url('/admin/attendance/staff/' . $user->id . '/date/' . $date->toDateString()) }}">詳細</a>
+                @endif
+            </td>
         </tr>
         @endif
         @endforeach

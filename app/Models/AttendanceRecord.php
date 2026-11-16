@@ -229,6 +229,28 @@ class AttendanceRecord extends Model
     }
 
     /**
+     * 管理者の直接修正で、渡された人と日付の勤怠を作って書き、作った勤怠を返す。勤怠がない日の直接修正から呼ぶ。
+     * 勤怠は出勤が必須なので、送られた出勤で作ってから applyAdminEdit() で書く。勤怠の作成と書き込みを1つのトランザクションにまとめ、どちらかが失敗したら両方を元に戻す。
+     *
+     * @param  User  $user  勤怠を作る一般ユーザー
+     * @param  string  $date  勤怠を作る日（例：2026-11-03）
+     * @param  array{new_clock_in: string, new_clock_out: string, new_break_in?: array<int, string|null>, new_break_out?: array<int, string|null>, comment: string}  $validated  バリデーションを通った入力
+     * @return self 作って書いた勤怠
+     */
+    public static function createFromAdminEdit(User $user, string $date, array $validated): self
+    {
+        return DB::transaction(function () use ($user, $date, $validated): self {
+            $attendanceRecord = self::firstOrCreate(
+                ['user_id' => $user->id, 'date' => $date],
+                ['clock_in' => $validated['new_clock_in']],
+            );
+            $attendanceRecord->applyAdminEdit($validated);
+
+            return $attendanceRecord;
+        });
+    }
+
+    /**
      * 渡された出勤、退勤、備考と休憩の行で、この勤怠を1つのトランザクションで書き換える。管理者の直接修正と修正申請の承認の両方から呼ぶ。
      * 時と分を変えていない出勤と退勤は、今の値（秒を含む）を残す。休憩の秒は replaceBreaks() が残す。
      *
