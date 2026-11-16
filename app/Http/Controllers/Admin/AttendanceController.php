@@ -24,9 +24,9 @@ class AttendanceController extends Controller
 
         $attendanceRecords = AttendanceRecord::where('date', $date->toDateString())->get();
 
-        $users = User::where('admin_status', false)
+        $users = User::general()
             ->orWhereIn('id', $attendanceRecords->pluck('user_id'))
-            ->orderBy('id')
+            ->orderByRegistration()
             ->get();
 
         return view('admin.admin-attendance-list', [

@@ -89,6 +89,17 @@ class User extends Authenticatable
     }
 
     /**
+     * ユーザーを登録順（id の昇順）に並べる。
+     *
+     * @param  Builder<User>  $query  並べる前のユーザーのクエリ
+     * @return void 返す値はない
+     */
+    public function scopeOrderByRegistration(Builder $query): void
+    {
+        $query->orderBy('id');
+    }
+
+    /**
      * 今日の勤怠を返す。今日の行がなければ null を返す。
      *
      * @return AttendanceRecord|null 今日の勤怠

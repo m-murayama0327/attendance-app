@@ -16,7 +16,7 @@ class StaffController extends Controller
     public function index(): View
     {
         return view('admin.staff-list', [
-            'users' => User::general()->orderBy('id')->get(),
+            'users' => User::general()->orderByRegistration()->get(),
         ]);
     }
 }
