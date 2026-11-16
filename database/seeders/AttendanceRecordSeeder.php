@@ -6,6 +6,8 @@ use App\Models\AttendanceRecord;
 use App\Models\User;
 use Carbon\CarbonPeriod;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceRecordSeeder extends Seeder
 {
@@ -17,26 +19,25 @@ class AttendanceRecordSeeder extends Seeder
     public function run(): void
     {
         // 31日に動かしても月があふれないように、先に当月の1日にしてから5か月を引く
-        $period = CarbonPeriod::create(today()->startOfMonth()->subMonths(5), today()->subDay());
+        $weekdays = collect(CarbonPeriod::create(today()->startOfMonth()->subMonths(5), today()->subDay()))
+            ->reject(fn (Carbon $date): bool => $date->isWeekend());
 
-        foreach (User::all() as $user) {
-            foreach ($period as $date) {
-                if ($date->isWeekend()) {
-                    continue;
-                }
-
-                $attendanceRecord = AttendanceRecord::create([
-                    'user_id' => $user->id,
-                    'date' => $date->toDateString(),
-                    'clock_in' => '09:00:00',
-                    'clock_out' => '18:00:00',
-                ]);
-                $attendanceRecord->breaks()->create([
-                    'break_in' => '12:00:00',
-                    'break_out' => '13:00:00',
-                ]);
-                $attendanceRecord->recalculate();
-            }
-        }
+        User::all()->each(function (User $user) use ($weekdays): void {
+            $weekdays->each(function (Carbon $date) use ($user): void {
+                DB::transaction(function () use ($user, $date): void {
+                    $attendanceRecord = AttendanceRecord::create([
+                        'user_id' => $user->id,
+                        'date' => $date->toDateString(),
+                        'clock_in' => '09:00:00',
+                        'clock_out' => '18:00:00',
+                    ]);
+                    $attendanceRecord->breaks()->create([
+                        'break_in' => '12:00:00',
+                        'break_out' => '13:00:00',
+                    ]);
+                    $attendanceRecord->recalculate();
+                });
+            });
+        });
     }
 }

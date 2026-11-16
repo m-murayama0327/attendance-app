@@ -14,18 +14,16 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        $users = [
+        collect([
             ['name' => 'ユーザー1', 'email' => 'user1@example.com', 'admin_status' => false],
             ['name' => 'ユーザー2', 'email' => 'user2@example.com', 'admin_status' => false],
             ['name' => 'ユーザー3', 'email' => 'user3@example.com', 'admin_status' => true],
-        ];
-
-        foreach ($users as $user) {
+        ])->each(function (array $attributes): void {
             User::create([
-                ...$user,
+                ...$attributes,
                 'password' => 'password',
                 'email_verified_at' => now(),
             ]);
-        }
+        });
     }
 }
