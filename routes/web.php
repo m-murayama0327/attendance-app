@@ -43,19 +43,19 @@ Route::middleware(['auth', 'general'])->group(function (): void {
 });
 Route::middleware('auth')->group(function (): void {
     // 提供された Blade が一般ユーザーと管理者で同じパスを使うので、ログインしている人の役割を見て呼ぶコントローラーを分ける
-    Route::get('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord): mixed {
-        $controller = $request->user()->admin_status ? AdminAttendanceController::class : AttendanceController::class;
+    $callByRole = function (Request $request, string $generalController, string $adminController, string $method, array $parameters = []): mixed {
+        $controller = $request->user()->admin_status ? $adminController : $generalController;
 
-        return app()->call([app($controller), 'show'], ['attendanceRecord' => $attendanceRecord]);
+        return app()->call([app($controller), $method], $parameters);
+    };
+
+    Route::get('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord) use ($callByRole): mixed {
+        return $callByRole($request, AttendanceController::class, AdminAttendanceController::class, 'show', ['attendanceRecord' => $attendanceRecord]);
     })->whereNumber('attendanceRecord');
-    Route::post('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord): mixed {
-        $controller = $request->user()->admin_status ? AdminAttendanceController::class : AttendanceController::class;
-
-        return app()->call([app($controller), 'update'], ['attendanceRecord' => $attendanceRecord]);
+    Route::post('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord) use ($callByRole): mixed {
+        return $callByRole($request, AttendanceController::class, AdminAttendanceController::class, 'update', ['attendanceRecord' => $attendanceRecord]);
     })->whereNumber('attendanceRecord');
-    Route::get('/stamp_correction_request/list', function (Request $request): mixed {
-        $controller = $request->user()->admin_status ? AdminApplicationController::class : ApplicationController::class;
-
-        return app()->call([app($controller), 'index']);
+    Route::get('/stamp_correction_request/list', function (Request $request) use ($callByRole): mixed {
+        return $callByRole($request, ApplicationController::class, AdminApplicationController::class, 'index');
     });
 });
