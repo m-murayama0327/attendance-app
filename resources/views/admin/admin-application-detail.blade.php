@@ -51,7 +51,6 @@
                 <label class="applied-form__header">{{ $application->proposalBreaks->count() === 0 ? '休憩' : '休憩' . ($application->proposalBreaks->count() + 1) }}</label>
                 <div class="applied-form__input-group">
                     <input class="applied-form__input readonly" type="text" value="" readonly>
-                    <p>〜</p>
                     <input class="applied-form__input readonly" type="text" value="" readonly>
                 </div>
             </div>

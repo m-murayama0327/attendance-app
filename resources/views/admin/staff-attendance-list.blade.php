@@ -55,6 +55,8 @@
             <td class="table__description">
                 @if (!empty($attendanceRecords['id']))
                 <a class="table__item--detail-link" href="{{ url('/attendance/' . $attendanceRecords['id']) }}">詳細</a>
+                @elseif ($attendanceRecords['full_date'] < today()->toDateString())
+                <a class="table__item--detail-link" href="{{ url('/admin/attendance/staff/' . $user->id . '/date/' . $attendanceRecords['full_date']) }}">詳細</a>
                 @endif
             </td>
         </tr>

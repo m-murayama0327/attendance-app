@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
+use App\Providers\RouteServiceProvider;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -14,6 +14,15 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
+
+    // 提供された Blade が打刻の状態をこの文字で比べるので、値の文字は変えない
+    public const STATUS_OFF_DUTY = '勤務外';
+
+    public const STATUS_WORKING = '出勤中';
+
+    public const STATUS_ON_BREAK = '休憩中';
+
+    public const STATUS_FINISHED = '退勤済';
 
     /**
      * The attributes that are mass assignable.
@@ -59,13 +68,12 @@ class User extends Authenticatable
 
     /**
      * このユーザーの修正申請を返す。
-     * 申請は user_id を持たないため、このユーザーの勤怠を通して読む。
      *
-     * @return HasManyThrough このユーザーの修正申請の一覧
+     * @return HasMany このユーザーの修正申請の一覧
      */
-    public function applications(): HasManyThrough
+    public function applications(): HasMany
     {
-        return $this->hasManyThrough(Application::class, AttendanceRecord::class);
+        return $this->hasMany(Application::class);
     }
 
     /**
@@ -80,6 +88,17 @@ class User extends Authenticatable
     }
 
     /**
+     * ユーザーを登録順（id の昇順）に並べる。
+     *
+     * @param  Builder<User>  $query  並べる前のユーザーのクエリ
+     * @return void 返す値はない
+     */
+    public function scopeOrderByRegistration(Builder $query): void
+    {
+        $query->orderBy('id');
+    }
+
+    /**
      * 今日の勤怠を返す。今日の行がなければ null を返す。
      *
      * @return AttendanceRecord|null 今日の勤怠
@@ -90,6 +109,40 @@ class User extends Authenticatable
     }
 
     /**
+     * 今日の勤怠と休憩から、勤務外、出勤中、休憩中、退勤済のどれかを返す。
+     * 打刻の状態の表示と打刻の処理が、同じ決め方を使うためのメソッド。
+     *
+     * @param  AttendanceRecord|null  $attendanceRecord  今日の勤怠（今日の行がなければ null）
+     * @return string 打刻の状態の文字（STATUS_ で始まる定数のどれか）
+     */
+    public static function resolveAttendanceStatus(?AttendanceRecord $attendanceRecord): string
+    {
+        if ($attendanceRecord === null) {
+            return self::STATUS_OFF_DUTY;
+        }
+
+        if ($attendanceRecord->clock_out !== null) {
+            return self::STATUS_FINISHED;
+        }
+
+        if ($attendanceRecord->breaks()->open()->exists()) {
+            return self::STATUS_ON_BREAK;
+        }
+
+        return self::STATUS_WORKING;
+    }
+
+    /**
+     * ログインした後とトップページで移す先のパスを返す。管理者は勤怠一覧画面（管理者）、一般ユーザーは打刻画面にする。
+     *
+     * @return string 移す先のパス
+     */
+    public function homePath(): string
+    {
+        return $this->admin_status ? '/admin/attendance/list' : RouteServiceProvider::HOME;
+    }
+
+    /**
      * 今日の勤怠と休憩から、勤務外、出勤中、休憩中、退勤済のどれかを返す（`$user->attendance_status` で読む）。
      * 打刻の直後に古い状態を出さないよう、読むたびにデータベースを読む。
      *
@@ -97,22 +150,6 @@ class User extends Authenticatable
      */
     protected function attendanceStatus(): Attribute
     {
-        return Attribute::get(function (): string {
-            $record = $this->findTodayAttendanceRecord();
-
-            if ($record === null) {
-                return '勤務外';
-            }
-
-            if ($record->clock_out !== null) {
-                return '退勤済';
-            }
-
-            if ($record->breaks()->whereNull('break_out')->exists()) {
-                return '休憩中';
-            }
-
-            return '出勤中';
-        });
+        return Attribute::get(fn (): string => self::resolveAttendanceStatus($this->findTodayAttendanceRecord()));
     }
 }

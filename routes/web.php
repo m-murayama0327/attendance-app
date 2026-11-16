@@ -26,36 +26,40 @@ Route::get('/', HomeController::class);
 Route::get('/admin/login', [AuthenticatedSessionController::class, 'create'])->middleware('guest:web');
 Route::post('/admin/login', [AuthenticatedSessionController::class, 'store'])->middleware(['guest:web', 'throttle:login']);
 Route::post('/admin/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('admin');
-Route::middleware('admin')->group(function () {
+Route::middleware('admin')->group(function (): void {
     Route::get('/admin/attendance/list', [AdminAttendanceController::class, 'index']);
     Route::get('/admin/attendance/staff/{id}', [AdminAttendanceController::class, 'staff'])->whereNumber('id');
+    Route::get('/admin/attendance/staff/{id}/date/{date}', [AdminAttendanceController::class, 'showDate'])->whereNumber('id');
+    Route::post('/admin/attendance/staff/{id}/date/{date}', [AdminAttendanceController::class, 'updateDate'])->whereNumber('id');
     Route::get('/admin/attendance/{attendanceRecord}', [AdminAttendanceController::class, 'show'])->whereNumber('attendanceRecord');
     Route::get('/admin/staff/list', [StaffController::class, 'index']);
     Route::get('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'show'])->whereNumber('attendance_correct_request_id');
     Route::post('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'approve'])->whereNumber('attendance_correct_request_id');
 });
-Route::middleware(['auth', 'general'])->group(function () {
+Route::middleware(['auth', 'general'])->group(function (): void {
     Route::get('/attendance', [AttendanceController::class, 'index']);
     Route::post('/attendance', [AttendanceController::class, 'store']);
     Route::get('/attendance/list', [AttendanceController::class, 'list']);
     Route::get('/attendance/detail/{attendanceRecord}', [AttendanceController::class, 'show'])->whereNumber('attendanceRecord');
+    Route::get('/attendance/date/{date}', [AttendanceController::class, 'showDate']);
+    Route::post('/attendance/date/{date}', [AttendanceController::class, 'updateDate']);
     Route::get('/application/{application}', [ApplicationController::class, 'show'])->whereNumber('application');
 });
-Route::middleware('auth')->group(function () {
+Route::middleware('auth')->group(function (): void {
     // 提供された Blade が一般ユーザーと管理者で同じパスを使うので、ログインしている人の役割を見て呼ぶコントローラーを分ける
-    Route::get('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord): mixed {
-        $controller = $request->user()->admin_status ? AdminAttendanceController::class : AttendanceController::class;
+    $callByRole = function (Request $request, string $generalController, string $adminController, string $method, array $parameters = []): mixed {
+        $controller = $request->user()->admin_status ? $adminController : $generalController;
 
-        return app()->call([app($controller), 'show'], ['attendanceRecord' => $attendanceRecord]);
+        return app()->call([app($controller), $method], $parameters);
+    };
+
+    Route::get('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord) use ($callByRole): mixed {
+        return $callByRole($request, AttendanceController::class, AdminAttendanceController::class, 'show', ['attendanceRecord' => $attendanceRecord]);
     })->whereNumber('attendanceRecord');
-    Route::post('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord): mixed {
-        $controller = $request->user()->admin_status ? AdminAttendanceController::class : AttendanceController::class;
-
-        return app()->call([app($controller), 'update'], ['attendanceRecord' => $attendanceRecord]);
+    Route::post('/attendance/{attendanceRecord}', function (Request $request, AttendanceRecord $attendanceRecord) use ($callByRole): mixed {
+        return $callByRole($request, AttendanceController::class, AdminAttendanceController::class, 'update', ['attendanceRecord' => $attendanceRecord]);
     })->whereNumber('attendanceRecord');
-    Route::get('/stamp_correction_request/list', function (Request $request): mixed {
-        $controller = $request->user()->admin_status ? AdminApplicationController::class : ApplicationController::class;
-
-        return app()->call([app($controller), 'index']);
+    Route::get('/stamp_correction_request/list', function (Request $request) use ($callByRole): mixed {
+        return $callByRole($request, ApplicationController::class, AdminApplicationController::class, 'index');
     });
 });

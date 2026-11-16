@@ -9,13 +9,16 @@ class AttendanceDetailRequest extends FormRequest
 {
     /**
      * 勤怠を直してよい人（勤怠の持ち主か管理者）かを、AttendanceRecordPolicy の update() で確かめる。
-     * 入力を確かめる前に動くので、他の人が送ると、値によらず 403 になる。勤怠がなければ、ここに来る前にルートモデルバインディングが 404 にする。
+     * 入力を確かめる前に動くので、他の人が送ると、値によらず 403 になる。勤怠の id のルートで勤怠がなければ、ここに来る前にルートモデルバインディングが 404 にする。
+     * 勤怠がない日のルート（ルートに勤怠がない）は、一般ユーザーはログインしている自分の日だけを扱い、管理者は admin のミドルウェアが守るので、ここでは確かめずに true を返す。
      *
      * @return bool 直してよいなら true
      */
     public function authorize(): bool
     {
-        return $this->user()->can('update', $this->route('attendanceRecord'));
+        $attendanceRecord = $this->route('attendanceRecord');
+
+        return $attendanceRecord === null || $this->user()->can('update', $attendanceRecord);
     }
 
     /**
@@ -52,15 +55,16 @@ class AttendanceDetailRequest extends FormRequest
 
             // 長い休憩の中に短い休憩が2つ入っても見逃さないよう、直前の休憩ではなく、それまでで一番遅い戻りと比べる
             $breaks = collect($this->input('new_break_in', []))
-                ->map(fn ($breakIn, $index) => ['index' => $index, 'in' => $breakIn, 'out' => $this->input("new_break_out.{$index}")])
-                ->filter(fn (array $break) => filled($break['in']) && filled($break['out']))
+                ->map(fn (?string $breakIn, int|string $index): array => ['index' => $index, 'in' => $breakIn, 'out' => $this->input("new_break_out.{$index}")])
+                ->filter(fn (array $break): bool => filled($break['in']) && filled($break['out']))
                 ->sortBy('in');
 
             $latestOut = null;
 
+            // 一番遅い戻りを次の休憩に持ち越して比べる処理で、reduce() にすると持ち越す値とエラーを付ける処理が混ざって読みにくくなるため、foreach のままにする
             foreach ($breaks as $break) {
                 if ($latestOut !== null && $break['in'] < $latestOut) {
-                    $validator->errors()->add("new_break_in.{$break['index']}", '休憩時間が不適切な値です');
+                    $validator->errors()->add("new_break_in.{$break['index']}", $this->messages()['new_break_in.*.after_or_equal']);
                 }
 
                 $latestOut = max($latestOut ?? $break['out'], $break['out']);
@@ -69,7 +73,7 @@ class AttendanceDetailRequest extends FormRequest
     }
 
     /**
-     * 入力の決まりに反したときの文言を返す。文言は機能要件の FN029 のものを使い、FN029 にない場合は自分で決めた文言にする。
+     * 入力の決まりに反したときの文言を返す。文言は要件の修正申請の文言を使い、要件にない場合は自分で決めた文言にする。
      *
      * @return array<string, string> 決まりごとの文言
      */

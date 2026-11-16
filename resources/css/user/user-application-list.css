@@ -93,3 +93,13 @@
 .application__tab--input {
     display: none;
 }
+
+/* 申請理由は長い文字や改行が入ることがあり、そのままだと何段にも折り返されて表が崩れるので、セルの幅に収まらない分を「…」にして1行で出す */
+.table__description:nth-child(4) .table__description--item {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

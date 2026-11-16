@@ -47,13 +47,12 @@
 .applied-form__input-group {
     display: flex;
     align-items: center;
-    /* 名前(1個)・日付(2個)・時間(3個)など子要素数が異なる行でも、値カラムの
-       開始位置(start)を全行そろえるため、space-between をやめ左寄せ(flex-start)にする */
-    justify-content: flex-start;
+    /* どの行も組の幅を同じにして真ん中に置き、値を左右の端に並べて、名前、日付、時刻、備考の値の左右の端をそろえる */
+    justify-content: space-between;
     gap: 0.5rem;
-    margin: 0;
+    margin: 0 auto;
     padding: 0;
-    width: auto;
+    width: 245px;
 }
 
 .applied-form__input,
@@ -68,7 +67,8 @@
     height: 30px;
     outline: none;
     padding: 5px;
-    text-align: center;
+    /* 備考の文字と始まりをそろえるため、値を枠の左に寄せる */
+    text-align: left;
     width: 80px;
 }
 

@@ -6,10 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AttendanceDetailRequest;
 use App\Models\AttendanceRecord;
 use App\Models\User;
-use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class AttendanceController extends Controller
@@ -22,22 +20,13 @@ class AttendanceController extends Controller
      */
     public function index(Request $request): View
     {
-        $date = today();
-        $dateValue = $request->query('date');
-
-        if (is_string($dateValue)) {
-            try {
-                $date = Carbon::parse($dateValue)->startOfDay();
-            } catch (InvalidFormatException) {
-                // 読めない値はエラーを出す画面がないので、今日のままにする
-            }
-        }
+        $date = AttendanceRecord::parseDateQuery($request->query('date'));
 
         $attendanceRecords = AttendanceRecord::where('date', $date->toDateString())->get();
 
-        $users = User::where('admin_status', false)
+        $users = User::general()
             ->orWhereIn('id', $attendanceRecords->pluck('user_id'))
-            ->orderBy('id')
+            ->orderByRegistration()
             ->get();
 
         return view('admin.admin-attendance-list', [
@@ -81,10 +70,27 @@ class AttendanceController extends Controller
      */
     public function show(Request $request, AttendanceRecord $attendanceRecord): View
     {
-        return view('admin.admin-detail', [
-            'attendanceRecord' => $attendanceRecord->toDetailData($request->session()->getOldInput()),
-            'user' => $attendanceRecord->user,
-        ]);
+        return $this->renderDetail($request, $attendanceRecord);
+    }
+
+    /**
+     * 一般ユーザーの勤怠がない日の、管理者の勤怠詳細の画面を出す。id が一般ユーザーでないか、日付が読めないか、今日か今日より後の日なら 404 にする。
+     * その人のその日の勤怠がすでにあれば、勤怠の id の勤怠詳細へ移す。なければ、保存していない勤怠で空の勤怠詳細を出す。
+     *
+     * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
+     * @param  int  $id  URL の一般ユーザーの id
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return View|RedirectResponse 管理者の勤怠詳細の画面か、その日の勤怠の勤怠詳細への転送
+     */
+    public function showDate(Request $request, int $id, string $date): View|RedirectResponse
+    {
+        $attendanceRecord = $this->findOrNewForDate($id, $date);
+
+        if ($attendanceRecord->exists) {
+            return redirect('/attendance/'.$attendanceRecord->id);
+        }
+
+        return $this->renderDetail($request, $attendanceRecord);
     }
 
     /**
@@ -99,5 +105,59 @@ class AttendanceController extends Controller
         $attendanceRecord->applyAdminEdit($request->validated());
 
         return redirect('/attendance/'.$attendanceRecord->id);
+    }
+
+    /**
+     * 一般ユーザーの勤怠がない日の勤怠を直接修正で作り、作った勤怠の勤怠詳細の画面へ移す。id が一般ユーザーでないか、日付が読めないか、今日か今日より後の日なら 404 にする。
+     * その人のその日の勤怠がすでにあれば、作らずに勤怠の id の勤怠詳細へ移す。
+     *
+     * @param  AttendanceDetailRequest  $request  入力の決まりを確かめたリクエスト
+     * @param  int  $id  URL の一般ユーザーの id
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return RedirectResponse 勤怠詳細の画面への転送
+     */
+    public function updateDate(AttendanceDetailRequest $request, int $id, string $date): RedirectResponse
+    {
+        $attendanceRecord = $this->findOrNewForDate($id, $date);
+
+        if (! $attendanceRecord->exists) {
+            $attendanceRecord = AttendanceRecord::createFromAdminEdit($attendanceRecord->user, $attendanceRecord->date, $request->validated());
+        }
+
+        return redirect('/attendance/'.$attendanceRecord->id);
+    }
+
+    /**
+     * 管理者の勤怠詳細の画面を作る。勤怠がない日は、保存していない勤怠を渡す。入力の誤りで戻ったときは、送った値で時刻、休憩、備考を置き換える。
+     *
+     * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
+     * @param  AttendanceRecord  $attendanceRecord  画面に出す勤怠（勤怠がない日は保存していない勤怠）
+     * @return View 管理者の勤怠詳細の画面
+     */
+    private function renderDetail(Request $request, AttendanceRecord $attendanceRecord): View
+    {
+        return view('admin.admin-detail', [
+            'attendanceRecord' => $attendanceRecord->toDetailData($request->old()),
+            'user' => $attendanceRecord->user,
+        ]);
+    }
+
+    /**
+     * URL の id の一般ユーザーと日付を読み、その人のその日の勤怠を返す。勤怠がなければ、保存していない勤怠を作って返す。
+     * id が一般ユーザーでないか、日付が読めないか、今日か今日より後の日なら 404 にする。
+     *
+     * @param  int  $id  URL の一般ユーザーの id
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return AttendanceRecord その日の勤怠（勤怠がなければ保存していない勤怠）
+     */
+    private function findOrNewForDate(int $id, string $date): AttendanceRecord
+    {
+        $user = User::general()->findOrFail($id);
+        $day = AttendanceRecord::parseDateParameter($date);
+
+        // 今日はまだ出勤を打刻でき、今日より後の日はまだ来ていないので、昨日までの日だけを開ける
+        abort_if($day === null || ! $day->isBefore(today()), 404);
+
+        return AttendanceRecord::firstOrNew(['user_id' => $user->id, 'date' => $day->toDateString()]);
     }
 }

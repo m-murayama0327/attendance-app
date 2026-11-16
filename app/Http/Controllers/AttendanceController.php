@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\AttendanceDetailRequest;
 use App\Http\Requests\StampRequest;
+use App\Models\Application;
 use App\Models\AttendanceRecord;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -56,18 +58,18 @@ class AttendanceController extends Controller
         $user = $request->user();
         $action = $request->validated('action');
 
-        DB::transaction(function () use ($user, $action) {
-            $status = $user->attendance_status;
-            $record = $user->findTodayAttendanceRecord();
+        DB::transaction(function () use ($user, $action): void {
+            $attendanceRecord = $user->findTodayAttendanceRecord();
+            $status = User::resolveAttendanceStatus($attendanceRecord);
 
-            if ($action === 'clock_in' && $status === '勤務外') {
+            if ($action === AttendanceRecord::ACTION_CLOCK_IN && $status === User::STATUS_OFF_DUTY) {
                 AttendanceRecord::clockIn($user);
-            } elseif ($action === 'clock_out' && $status === '出勤中') {
-                $record->clockOut();
-            } elseif ($action === 'break_in' && $status === '出勤中') {
-                $record->breakIn();
-            } elseif ($action === 'break_out' && $status === '休憩中') {
-                $record->breakOut();
+            } elseif ($action === AttendanceRecord::ACTION_CLOCK_OUT && $status === User::STATUS_WORKING) {
+                $attendanceRecord->clockOut();
+            } elseif ($action === AttendanceRecord::ACTION_BREAK_IN && $status === User::STATUS_WORKING) {
+                $attendanceRecord->breakIn();
+            } elseif ($action === AttendanceRecord::ACTION_BREAK_OUT && $status === User::STATUS_ON_BREAK) {
+                $attendanceRecord->breakOut();
             }
         });
 
@@ -86,14 +88,26 @@ class AttendanceController extends Controller
     {
         $this->authorize('view', $attendanceRecord);
 
-        $application = $attendanceRecord->pendingApplication();
-        $detail = $attendanceRecord->toDetailData($application === null ? $request->session()->getOldInput() : []);
-        $detail['application'] = $application;
+        return $this->renderDetail($request, $attendanceRecord);
+    }
 
-        return view('user.user-detail', [
-            'data' => $detail,
-            'user' => $attendanceRecord->user,
-        ]);
+    /**
+     * 勤怠がない日の勤怠詳細の画面を出す。日付が読めないか、今日か今日より後の日なら 404 にする。
+     * その日の勤怠がすでにあれば、勤怠の id の勤怠詳細へ移す。なければ、保存していない勤怠で空の勤怠詳細を出す。
+     *
+     * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return View|RedirectResponse 勤怠詳細の画面か、その日の勤怠の勤怠詳細への転送
+     */
+    public function showDate(Request $request, string $date): View|RedirectResponse
+    {
+        $attendanceRecord = $this->findOrNewForDate($request, $date);
+
+        if ($attendanceRecord->exists) {
+            return redirect('/attendance/'.$attendanceRecord->id);
+        }
+
+        return $this->renderDetail($request, $attendanceRecord);
     }
 
     /**
@@ -106,34 +120,71 @@ class AttendanceController extends Controller
      */
     public function update(AttendanceDetailRequest $request, AttendanceRecord $attendanceRecord): RedirectResponse
     {
-        if ($attendanceRecord->pendingApplication() !== null) {
+        if ($attendanceRecord->pendingApplication() === null) {
+            Application::submit($attendanceRecord, $request->validated());
+        }
+
+        return redirect('/attendance/'.$attendanceRecord->id);
+    }
+
+    /**
+     * 勤怠がない日の修正申請を作り、その日の勤怠詳細の画面へ戻す。日付が読めないか、今日か今日より後の日なら 404 にする。
+     * その日の勤怠がすでにあれば、申請を作らずに勤怠の id の勤怠詳細へ移す。承認待ちの申請がある日には、画面に修正のボタンが出なくても送られうるので、申請を作らない。
+     *
+     * @param  AttendanceDetailRequest  $request  入力の決まりを確かめたリクエスト
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return RedirectResponse その日の勤怠詳細の画面への転送
+     */
+    public function updateDate(AttendanceDetailRequest $request, string $date): RedirectResponse
+    {
+        $attendanceRecord = $this->findOrNewForDate($request, $date);
+
+        if ($attendanceRecord->exists) {
             return redirect('/attendance/'.$attendanceRecord->id);
         }
 
-        DB::transaction(function () use ($request, $attendanceRecord): void {
-            $application = $attendanceRecord->applications()->create([
-                'new_clock_in' => $request->validated('new_clock_in'),
-                'new_clock_out' => $request->validated('new_clock_out'),
-                'comment' => $request->validated('comment'),
-            ]);
+        if ($attendanceRecord->pendingApplication() === null) {
+            Application::submit($attendanceRecord, $request->validated());
+        }
 
-            $breakOuts = $request->validated('new_break_out', []);
+        return redirect('/attendance/date/'.$date);
+    }
 
-            foreach ($request->validated('new_break_in', []) as $index => $breakIn) {
-                $breakOut = $breakOuts[$index] ?? null;
+    /**
+     * 一般ユーザーの勤怠詳細の画面を作る。勤怠がない日は、保存していない勤怠を渡す。
+     * 承認待ちの申請がなく、入力の誤りで戻ったときは、送った値で時刻、休憩、備考を置き換える。承認待ちの申請があるときは読み取り専用で出すので、送った値は使わない。
+     *
+     * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
+     * @param  AttendanceRecord  $attendanceRecord  画面に出す勤怠（勤怠がない日は保存していない勤怠）
+     * @return View 勤怠詳細の画面
+     */
+    private function renderDetail(Request $request, AttendanceRecord $attendanceRecord): View
+    {
+        $application = $attendanceRecord->pendingApplication();
+        $detail = $attendanceRecord->toDetailData($application === null ? $request->old() : []);
+        $detail['application'] = $application;
 
-                // 入りと戻りが両方空の行は、追加用の空の行か、消した休憩の行なので、申請の休憩にしない
-                if (blank($breakIn) && blank($breakOut)) {
-                    continue;
-                }
+        return view('user.user-detail', [
+            'data' => $detail,
+            'user' => $attendanceRecord->user,
+        ]);
+    }
 
-                $application->proposalBreaks()->create([
-                    'break_in' => $breakIn,
-                    'break_out' => $breakOut,
-                ]);
-            }
-        });
+    /**
+     * URL の日付を読み、ログインしている人のその日の勤怠を返す。勤怠がなければ、保存していない勤怠を作って返す。
+     * 日付が読めないか、今日か今日より後の日なら 404 にする。
+     *
+     * @param  Request  $request  届いたリクエスト
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return AttendanceRecord その日の勤怠（勤怠がなければ保存していない勤怠）
+     */
+    private function findOrNewForDate(Request $request, string $date): AttendanceRecord
+    {
+        $day = AttendanceRecord::parseDateParameter($date);
 
-        return redirect('/attendance/'.$attendanceRecord->id);
+        // 今日はまだ出勤を打刻でき、今日より後の日はまだ来ていないので、昨日までの日だけを開ける
+        abort_if($day === null || ! $day->isBefore(today()), 404);
+
+        return AttendanceRecord::firstOrNew(['user_id' => $request->user()->id, 'date' => $day->toDateString()]);
     }
 }

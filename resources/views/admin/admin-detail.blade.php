@@ -9,7 +9,7 @@
         <div class="detail__header">
             <h1 class="content__header--item">勤怠詳細</h1>
         </div>
-        <form class="form" action="{{ url('/attendance/' . $attendanceRecord['id']) }}" method="post">
+        <form class="form" action="{{ url($attendanceRecord['id'] ? '/attendance/' . $attendanceRecord['id'] : '/admin/attendance/staff/' . $user->id . '/date/' . $attendanceRecord['full_date']) }}" method="post">
             @csrf
                 <div class="form__content">
                     <div class="form__group">
@@ -81,7 +81,6 @@
                         <label class="form__header">{{ $newBreakIndex === 0 ? '休憩' : '休憩' . ($newBreakIndex + 1) }}</label>
                         <div class="form__input-group">
                             <input class="form__input" type="text" name="new_break_in[{{ $newBreakIndex }}]" value="">
-                            <p>〜</p>
                             <input class="form__input" type="text" name="new_break_out[{{ $newBreakIndex }}]" value="">
                         </div>
                     </div>

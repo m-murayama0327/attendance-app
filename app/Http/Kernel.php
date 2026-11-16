@@ -42,7 +42,6 @@ class Kernel extends HttpKernel
      * @var array<int, class-string|string>
      */
     protected $middleware = [
-        // \App\Http\Middleware\TrustHosts::class,
         TrustProxies::class,
         HandleCors::class,
         PreventRequestsDuringMaintenance::class,
@@ -67,7 +66,6 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             ThrottleRequests::class.':api',
             SubstituteBindings::class,
         ],
@@ -96,7 +94,7 @@ class Kernel extends HttpKernel
         'verified' => EnsureEmailIsVerified::class,
     ];
 
-    // 管理者の画面で、URL の番号の勤怠がないときに管理者かを確かめる前に 404 を返さないよう、EnsureUserIsAdmin を SubstituteBindings より前に置く。他の行は Laravel の既定の順のまま
+    // URL の番号の勤怠や申請がないときに役割を確かめる前に 404 を返さないよう、管理者の画面の EnsureUserIsAdmin と一般ユーザーの画面の EnsureUserIsGeneral を SubstituteBindings より前に置く。他の行は Laravel の既定の順のまま
     protected $middlewarePriority = [
         HandlePrecognitiveRequests::class,
         EncryptCookies::class,
@@ -108,6 +106,7 @@ class Kernel extends HttpKernel
         ThrottleRequestsWithRedis::class,
         AuthenticatesSessions::class,
         EnsureUserIsAdmin::class,
+        EnsureUserIsGeneral::class,
         SubstituteBindings::class,
         Authorize::class,
     ];
