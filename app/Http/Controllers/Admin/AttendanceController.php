@@ -6,10 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AttendanceDetailRequest;
 use App\Models\AttendanceRecord;
 use App\Models\User;
-use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class AttendanceController extends Controller
@@ -22,16 +20,7 @@ class AttendanceController extends Controller
      */
     public function index(Request $request): View
     {
-        $date = today();
-        $dateValue = $request->query('date');
-
-        if (is_string($dateValue)) {
-            try {
-                $date = Carbon::parse($dateValue)->startOfDay();
-            } catch (InvalidFormatException) {
-                // 読めない値はエラーを出す画面がないので、今日のままにする
-            }
-        }
+        $date = AttendanceRecord::parseDateQuery($request->query('date'));
 
         $attendanceRecords = AttendanceRecord::where('date', $date->toDateString())->get();
 

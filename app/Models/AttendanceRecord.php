@@ -296,6 +296,25 @@ class AttendanceRecord extends Model
     }
 
     /**
+     * ?date= の値を、その日の初めの時刻にして返す。値がないか読めないときは、今日にする。
+     *
+     * @param  mixed  $value  ?date= の値
+     * @return Carbon 表示する日の初めの時刻
+     */
+    public static function parseDateQuery(mixed $value): Carbon
+    {
+        if (is_string($value)) {
+            try {
+                return Carbon::parse($value)->startOfDay();
+            } catch (InvalidFormatException) {
+                // 読めない値はエラーを出す画面がないので、今日にする
+            }
+        }
+
+        return today();
+    }
+
+    /**
      * ?date= の値から、表示する月の初めの日と、前の月と次の月の値を返す。値がないか読めないときは、今の月にする。
      *
      * @param  mixed  $value  ?date= の値
@@ -303,15 +322,7 @@ class AttendanceRecord extends Model
      */
     public static function resolveMonthView(mixed $value): array
     {
-        $date = today()->startOfMonth();
-
-        if (is_string($value)) {
-            try {
-                $date = Carbon::parse($value)->startOfMonth();
-            } catch (InvalidFormatException) {
-                // 読めない値はエラーを出す画面がないので、今の月のままにする
-            }
-        }
+        $date = self::parseDateQuery($value)->startOfMonth();
 
         return [
             'date' => $date,
