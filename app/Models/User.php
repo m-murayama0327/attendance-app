@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Providers\RouteServiceProvider;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -131,6 +132,16 @@ class User extends Authenticatable
         }
 
         return self::STATUS_WORKING;
+    }
+
+    /**
+     * ログインした後とトップページで移す先のパスを返す。管理者は勤怠一覧画面（管理者）、一般ユーザーは打刻画面にする。
+     *
+     * @return string 移す先のパス
+     */
+    public function homePath(): string
+    {
+        return $this->admin_status ? '/admin/attendance/list' : RouteServiceProvider::HOME;
     }
 
     /**

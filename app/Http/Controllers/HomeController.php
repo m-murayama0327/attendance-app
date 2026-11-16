@@ -20,10 +20,6 @@ class HomeController extends Controller
             return redirect('/login');
         }
 
-        if ($user->admin_status) {
-            return redirect('/admin/attendance/list');
-        }
-
-        return redirect('/attendance');
+        return redirect($user->homePath());
     }
 }
