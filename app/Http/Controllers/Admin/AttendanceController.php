@@ -127,6 +127,13 @@ class AttendanceController extends Controller
         return redirect('/attendance/'.$attendanceRecord->id);
     }
 
+    /**
+     * 管理者の勤怠詳細の画面を作る。勤怠がない日は、保存していない勤怠を渡す。入力の誤りで戻ったときは、送った値で時刻、休憩、備考を置き換える。
+     *
+     * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
+     * @param  AttendanceRecord  $attendanceRecord  画面に出す勤怠（勤怠がない日は保存していない勤怠）
+     * @return View 管理者の勤怠詳細の画面
+     */
     private function renderDetail(Request $request, AttendanceRecord $attendanceRecord): View
     {
         return view('admin.admin-detail', [
@@ -135,6 +142,14 @@ class AttendanceController extends Controller
         ]);
     }
 
+    /**
+     * URL の id の一般ユーザーと日付を読み、その人のその日の勤怠を返す。勤怠がなければ、保存していない勤怠を作って返す。
+     * id が一般ユーザーでないか、日付が読めないか、今日か今日より後の日なら 404 にする。
+     *
+     * @param  int  $id  URL の一般ユーザーの id
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return AttendanceRecord その日の勤怠（勤怠がなければ保存していない勤怠）
+     */
     private function findOrNewForDate(int $id, string $date): AttendanceRecord
     {
         $user = User::general()->findOrFail($id);

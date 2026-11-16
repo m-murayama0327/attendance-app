@@ -18,6 +18,7 @@ class AttendanceRecord extends Model
 {
     use HasFactory;
 
+    // 提供された Blade の打刻のボタンがこの値を送るので、値の文字は変えない
     public const ACTION_CLOCK_IN = 'clock_in';
 
     public const ACTION_CLOCK_OUT = 'clock_out';
@@ -28,12 +29,15 @@ class AttendanceRecord extends Model
 
     public const ACTIONS = [self::ACTION_CLOCK_IN, self::ACTION_CLOCK_OUT, self::ACTION_BREAK_IN, self::ACTION_BREAK_OUT];
 
+    // 要件で決まった始業と終業の時刻で、出勤がこれより後なら遅刻、退勤がこれより前なら早退にする
     private const START_TIME = '09:00';
 
     private const END_TIME = '18:00';
 
+    // 要件で決まった基準で、勤務がこの分を超えた分を残業にする
     private const REGULAR_WORK_MINUTES = 480;
 
+    // 要件で決まった基準で、勤務がこの分を超えた日を長時間労働にする
     private const LONG_WORK_MINUTES = 600;
 
     protected $fillable = [
@@ -50,9 +54,14 @@ class AttendanceRecord extends Model
         'is_long_work' => 'boolean',
     ];
 
+    /**
+     * モデルのイベントを登録する。Laravel が、このモデルを最初に使うときに1回だけ呼ぶ。
+     * 勤怠を消すときに、同じ人と日付の申請も消す。申請は勤怠の番号を持たず、データベースの外部キーでは勤怠と一緒に消えないため。申請の休憩は、申請への外部キーで一緒に消える。
+     *
+     * @return void 返す値はない
+     */
     protected static function booted(): void
     {
-        // 申請は勤怠の番号を持たず、データベースの外部キーでは勤怠と一緒に消えないので、勤怠を消すときに同じ人と日付の申請も消す。申請の休憩は、申請への外部キーで一緒に消える
         static::deleting(function (AttendanceRecord $attendanceRecord): void {
             $attendanceRecord->sameDayApplications()->delete();
         });
@@ -495,20 +504,38 @@ class AttendanceRecord extends Model
         return Attribute::get(fn (): ?string => $this->break_minutes ? $this->toHourMinuteText($this->break_minutes) : null);
     }
 
+    /**
+     * 分の数を、08:00 の形の文字にして返す。
+     *
+     * @param  int  $minutes  分の数（例：480）
+     * @return string 時と分の文字（例：08:00）
+     */
     private function toHourMinuteText(int $minutes): string
     {
         return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
     }
 
+    /**
+     * 送った時刻と時と分が同じ今の時刻があれば、その今の時刻（秒を含む）を返し、なければ送った時刻を返す。
+     * 画面は分までしか入力できないので、時と分を変えていない時刻は、打刻で入った秒を消さないように今の値を使う。
+     *
+     * @param  string|null  $sentTime  画面から送った時刻（例：09:00）。休憩の戻りが空なら null
+     * @param  array<int, string|null>  $currentTimes  今の勤怠か休憩の時刻の一覧（例：09:00:19）
+     * @return string|null 保存する時刻
+     */
     private function keepSeconds(?string $sentTime, array $currentTimes): ?string
     {
-        // 画面は分までしか入力できないので、時と分を変えていない時刻は、打刻で入った秒を消さないように今の値を使う
         return collect($currentTimes)->first(fn (?string $currentTime): bool => $currentTime !== null && TimeFormat::toHourMinute($currentTime) === $sentTime) ?? $sentTime;
     }
 
+    /**
+     * 時刻の文字を、0時からの分の数にして返す。画面に出る時刻と計算の結果を合わせるため、秒は切り捨てる。
+     *
+     * @param  string  $time  時刻（例：09:00:19）
+     * @return int 0時からの分の数（例：540）
+     */
     private function toMinutes(string $time): int
     {
-        // 画面に出る時刻と計算の結果を合わせるため、秒は切り捨てる
         [$hours, $minutes] = explode(':', $time);
 
         return (int) $hours * 60 + (int) $minutes;

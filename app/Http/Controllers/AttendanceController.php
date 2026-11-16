@@ -150,9 +150,16 @@ class AttendanceController extends Controller
         return redirect('/attendance/date/'.$date);
     }
 
+    /**
+     * 一般ユーザーの勤怠詳細の画面を作る。勤怠がない日は、保存していない勤怠を渡す。
+     * 承認待ちの申請がなく、入力の誤りで戻ったときは、送った値で時刻、休憩、備考を置き換える。承認待ちの申請があるときは読み取り専用で出すので、送った値は使わない。
+     *
+     * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
+     * @param  AttendanceRecord  $attendanceRecord  画面に出す勤怠（勤怠がない日は保存していない勤怠）
+     * @return View 勤怠詳細の画面
+     */
     private function renderDetail(Request $request, AttendanceRecord $attendanceRecord): View
     {
-        // 承認待ちの申請があるときは読み取り専用で出すので、エラーで戻ったときに送った値は使わない
         $application = $attendanceRecord->pendingApplication();
         $detail = $attendanceRecord->toDetailData($application === null ? $request->old() : []);
         $detail['application'] = $application;
@@ -163,6 +170,14 @@ class AttendanceController extends Controller
         ]);
     }
 
+    /**
+     * URL の日付を読み、ログインしている人のその日の勤怠を返す。勤怠がなければ、保存していない勤怠を作って返す。
+     * 日付が読めないか、今日か今日より後の日なら 404 にする。
+     *
+     * @param  Request  $request  届いたリクエスト
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return AttendanceRecord その日の勤怠（勤怠がなければ保存していない勤怠）
+     */
     private function findOrNewForDate(Request $request, string $date): AttendanceRecord
     {
         $day = AttendanceRecord::parseDateParameter($date);
