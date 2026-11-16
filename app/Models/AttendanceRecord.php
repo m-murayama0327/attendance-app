@@ -279,7 +279,7 @@ class AttendanceRecord extends Model
      *
      * @param  User  $user  勤怠を読むユーザー
      * @param  Carbon  $month  表示する月の中の日
-     * @return array<int, array<string, int|string|null>> 日ごとの行（date、clock_in、clock_out、total_break_time、total_time、id）
+     * @return array<int, array<string, int|string|null>> 日ごとの行（date、full_date、clock_in、clock_out、total_break_time、total_time、id）
      */
     public static function monthlyRows(User $user, Carbon $month): array
     {
@@ -297,6 +297,7 @@ class AttendanceRecord extends Model
 
                 return [
                     'date' => $day->isoFormat('MM/DD(ddd)'),
+                    'full_date' => $day->toDateString(),
                     'clock_in' => $attendanceRecord?->formattedClockIn(),
                     'clock_out' => $attendanceRecord?->formattedClockOut(),
                     'total_break_time' => $attendanceRecord?->total_break_time,
@@ -324,6 +325,26 @@ class AttendanceRecord extends Model
         }
 
         return today();
+    }
+
+    /**
+     * ルートの {date} の文字を、Y-m-d の形で厳しく読み、その日の初めの時刻にして返す。読めない文字と日付としてない値は null を返す。
+     * 今日との前後は比べない（今日と今日より後の日を受け付けないのは、呼ぶ側で決める）。
+     *
+     * @param  string  $value  ルートの {date} の文字（例：2026-11-03）
+     * @return Carbon|null その日の初めの時刻。読めなければ null
+     */
+    public static function parseDateParameter(string $value): ?Carbon
+    {
+        try {
+            // 先頭の ! で、日付だけを読み、時刻を 00:00:00 にする
+            $date = Carbon::createFromFormat('!Y-m-d', $value);
+        } catch (InvalidFormatException) {
+            return null;
+        }
+
+        // 2026-02-30 は 2026-03-02 に、2026-2-3 は 2026-02-03 に読み替えられるので、読んだ日を同じ形に戻して元の文字と同じときだけ受け付ける
+        return $date->format('Y-m-d') === $value ? $date : null;
     }
 
     /**
@@ -356,9 +377,10 @@ class AttendanceRecord extends Model
     /**
      * 勤怠詳細の画面に渡す値を返す。休憩は入りの早い順に、0からの連番で並べる。
      * エラーで戻ったときに送った値を渡すと、備考の書き忘れだけで時刻を打ち直さないよう、時刻、休憩、備考を送った値に置き換える。
+     * 勤怠がない日の保存していない勤怠でも呼べ、そのときは id と時刻を null、休憩を空の配列にして返す。
      *
      * @param  array<string, mixed>  $oldInput  エラーで戻ったときに送った値（なければ空の配列で、勤怠の値のまま返す）
-     * @return array<string, mixed> id、year、date、clock_in、clock_out、breaks、comment
+     * @return array<string, mixed> id、year、date、full_date（フォームの送り先に使う Y-m-d の日付）、clock_in、clock_out、breaks、comment
      */
     public function toDetailData(array $oldInput = []): array
     {
@@ -368,6 +390,7 @@ class AttendanceRecord extends Model
             'id' => $this->id,
             'year' => $detailDate['year'],
             'date' => $detailDate['date'],
+            'full_date' => $this->date,
             'clock_in' => $this->formattedClockIn(),
             'clock_out' => $this->formattedClockOut(),
             'breaks' => $this->breaks()
@@ -410,11 +433,11 @@ class AttendanceRecord extends Model
     }
 
     /**
-     * 出勤を H:i の文字で返す。
+     * 出勤を H:i の文字で返す。勤怠がない日の保存していない勤怠で、出勤がなければ null を返す。
      *
-     * @return string 出勤（例：09:00）
+     * @return string|null 出勤（例：09:00）
      */
-    public function formattedClockIn(): string
+    public function formattedClockIn(): ?string
     {
         return TimeFormat::toHourMinute($this->clock_in);
     }

@@ -9,7 +9,7 @@
         <div class="detail__header">
             <h1 class="content__header--item">勤怠詳細</h1>
         </div>
-        <form class="form" action="{{ url('/attendance/' . $data['id']) }}" method="post">
+        <form class="form" action="{{ url($data['id'] ? '/attendance/' . $data['id'] : '/attendance/date/' . $data['full_date']) }}" method="post">
             @csrf
 
             @if (is_null($data['application']))

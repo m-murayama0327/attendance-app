@@ -39,6 +39,8 @@ Route::middleware(['auth', 'general'])->group(function (): void {
     Route::post('/attendance', [AttendanceController::class, 'store']);
     Route::get('/attendance/list', [AttendanceController::class, 'list']);
     Route::get('/attendance/detail/{attendanceRecord}', [AttendanceController::class, 'show'])->whereNumber('attendanceRecord');
+    Route::get('/attendance/date/{date}', [AttendanceController::class, 'showDate']);
+    Route::post('/attendance/date/{date}', [AttendanceController::class, 'updateDate']);
     Route::get('/application/{application}', [ApplicationController::class, 'show'])->whereNumber('application');
 });
 Route::middleware('auth')->group(function (): void {

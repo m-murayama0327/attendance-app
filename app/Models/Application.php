@@ -110,7 +110,7 @@ class Application extends Model
     /**
      * 申請詳細の画面に渡す値を返す。日付、時刻、休憩、備考は申請から作る。休憩は入りの早い順に、0からの連番で並べる。
      *
-     * @return array<string, mixed> id（同じ人と日付の勤怠の id。勤怠がなければ null）、application、year、date、clock_in、clock_out、breaks、comment
+     * @return array<string, mixed> id（同じ人と日付の勤怠の id。勤怠がなければ null）、application、year、date、full_date（フォームの送り先に使う Y-m-d の日付）、clock_in、clock_out、breaks、comment
      */
     public function toDetailData(): array
     {
@@ -121,6 +121,7 @@ class Application extends Model
             'application' => $this,
             'year' => $detailDate['year'],
             'date' => $detailDate['date'],
+            'full_date' => $this->date,
             'clock_in' => $this->new_clock_in,
             'clock_out' => $this->new_clock_out,
             'breaks' => $this->proposalBreaks
@@ -131,15 +132,44 @@ class Application extends Model
     }
 
     /**
+     * 渡された勤怠の人と日付で、修正申請と申請の休憩を作る。勤怠がない日は、保存していない勤怠を渡す。
+     * 申請と申請の休憩の書き込みを1つのトランザクションにまとめ、どちらかが失敗したら両方を元に戻す。入りと戻りが両方空の休憩の行は、toBreakRows() で除く。
+     *
+     * @param  AttendanceRecord  $attendanceRecord  申請する日の勤怠（勤怠がない日は保存していない勤怠）
+     * @param  array{new_clock_in: string, new_clock_out: string, new_break_in?: array<int, string|null>, new_break_out?: array<int, string|null>, comment: string}  $validated  バリデーションを通った入力
+     * @return void 返す値はない（作った申請と申請の休憩を保存する）
+     */
+    public static function submit(AttendanceRecord $attendanceRecord, array $validated): void
+    {
+        DB::transaction(function () use ($attendanceRecord, $validated): void {
+            $application = self::create([
+                'user_id' => $attendanceRecord->user_id,
+                'date' => $attendanceRecord->date,
+                'new_clock_in' => $validated['new_clock_in'],
+                'new_clock_out' => $validated['new_clock_out'],
+                'comment' => $validated['comment'],
+            ]);
+
+            $application->proposalBreaks()->createMany(
+                AttendanceRecord::toBreakRows($validated['new_break_in'] ?? [], $validated['new_break_out'] ?? []),
+            );
+        });
+    }
+
+    /**
      * 修正申請を承認する。申請の出勤、退勤、備考と休憩で申請先の勤怠を書き換え、申請を承認済みにする。
-     * 勤怠の書き換えと申請の書き込みを1つのトランザクションにまとめ、どちらかが失敗したら両方を元に戻す。
+     * 勤怠がない日の申請なら、申請の出勤で勤怠を作ってから書き換える。
+     * 勤怠の作成と書き換えと申請の書き込みを1つのトランザクションにまとめ、どれかが失敗したら全部を元に戻す。
      *
      * @return void 返す値はない（書き換えた勤怠と承認済みにした申請を保存する）
      */
     public function approve(): void
     {
         DB::transaction(function (): void {
-            $this->findAttendanceRecord()->rewrite(
+            AttendanceRecord::firstOrCreate(
+                ['user_id' => $this->user_id, 'date' => $this->date],
+                ['clock_in' => $this->new_clock_in],
+            )->rewrite(
                 $this->new_clock_in,
                 $this->new_clock_out,
                 $this->comment,

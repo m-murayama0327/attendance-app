@@ -88,14 +88,26 @@ class AttendanceController extends Controller
     {
         $this->authorize('view', $attendanceRecord);
 
-        $application = $attendanceRecord->pendingApplication();
-        $detail = $attendanceRecord->toDetailData($application === null ? $request->session()->getOldInput() : []);
-        $detail['application'] = $application;
+        return $this->renderDetail($request, $attendanceRecord);
+    }
 
-        return view('user.user-detail', [
-            'data' => $detail,
-            'user' => $attendanceRecord->user,
-        ]);
+    /**
+     * 勤怠がない日の勤怠詳細の画面を出す。日付が読めないか、今日か今日より後の日なら 404 にする。
+     * その日の勤怠がすでにあれば、勤怠の id の勤怠詳細へ移す。なければ、保存していない勤怠で空の勤怠詳細を出す。
+     *
+     * @param  Request  $request  届いたリクエスト（エラーで戻ったときは送った値を持つ）
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return View|RedirectResponse 勤怠詳細の画面か、その日の勤怠の勤怠詳細への転送
+     */
+    public function showDate(Request $request, string $date): View|RedirectResponse
+    {
+        $attendanceRecord = $this->findOrNewForDate($request, $date);
+
+        if ($attendanceRecord->exists) {
+            return redirect('/attendance/'.$attendanceRecord->id);
+        }
+
+        return $this->renderDetail($request, $attendanceRecord);
     }
 
     /**
@@ -108,24 +120,56 @@ class AttendanceController extends Controller
      */
     public function update(AttendanceDetailRequest $request, AttendanceRecord $attendanceRecord): RedirectResponse
     {
-        if ($attendanceRecord->pendingApplication() !== null) {
+        if ($attendanceRecord->pendingApplication() === null) {
+            Application::submit($attendanceRecord, $request->validated());
+        }
+
+        return redirect('/attendance/'.$attendanceRecord->id);
+    }
+
+    /**
+     * 勤怠がない日の修正申請を作り、その日の勤怠詳細の画面へ戻す。日付が読めないか、今日か今日より後の日なら 404 にする。
+     * その日の勤怠がすでにあれば、申請を作らずに勤怠の id の勤怠詳細へ移す。承認待ちの申請がある日には、画面に修正のボタンが出なくても送られうるので、申請を作らない。
+     *
+     * @param  AttendanceDetailRequest  $request  入力の決まりを確かめたリクエスト
+     * @param  string  $date  URL の日付（例：2026-11-03）
+     * @return RedirectResponse その日の勤怠詳細の画面への転送
+     */
+    public function updateDate(AttendanceDetailRequest $request, string $date): RedirectResponse
+    {
+        $attendanceRecord = $this->findOrNewForDate($request, $date);
+
+        if ($attendanceRecord->exists) {
             return redirect('/attendance/'.$attendanceRecord->id);
         }
 
-        DB::transaction(function () use ($request, $attendanceRecord): void {
-            $application = Application::create([
-                'user_id' => $attendanceRecord->user_id,
-                'date' => $attendanceRecord->date,
-                'new_clock_in' => $request->validated('new_clock_in'),
-                'new_clock_out' => $request->validated('new_clock_out'),
-                'comment' => $request->validated('comment'),
-            ]);
+        if ($attendanceRecord->pendingApplication() === null) {
+            Application::submit($attendanceRecord, $request->validated());
+        }
 
-            $application->proposalBreaks()->createMany(
-                AttendanceRecord::toBreakRows($request->validated('new_break_in', []), $request->validated('new_break_out', [])),
-            );
-        });
+        return redirect('/attendance/date/'.$date);
+    }
 
-        return redirect('/attendance/'.$attendanceRecord->id);
+    private function renderDetail(Request $request, AttendanceRecord $attendanceRecord): View
+    {
+        // 承認待ちの申請があるときは読み取り専用で出すので、エラーで戻ったときに送った値は使わない
+        $application = $attendanceRecord->pendingApplication();
+        $detail = $attendanceRecord->toDetailData($application === null ? $request->session()->getOldInput() : []);
+        $detail['application'] = $application;
+
+        return view('user.user-detail', [
+            'data' => $detail,
+            'user' => $attendanceRecord->user,
+        ]);
+    }
+
+    private function findOrNewForDate(Request $request, string $date): AttendanceRecord
+    {
+        $day = AttendanceRecord::parseDateParameter($date);
+
+        // 今日はまだ出勤を打刻でき、今日より後の日はまだ来ていないので、昨日までの日だけを開ける
+        abort_if($day === null || ! $day->isBefore(today()), 404);
+
+        return AttendanceRecord::firstOrNew(['user_id' => $request->user()->id, 'date' => $day->toDateString()]);
     }
 }

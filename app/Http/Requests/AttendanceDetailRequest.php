@@ -9,13 +9,16 @@ class AttendanceDetailRequest extends FormRequest
 {
     /**
      * 勤怠を直してよい人（勤怠の持ち主か管理者）かを、AttendanceRecordPolicy の update() で確かめる。
-     * 入力を確かめる前に動くので、他の人が送ると、値によらず 403 になる。勤怠がなければ、ここに来る前にルートモデルバインディングが 404 にする。
+     * 入力を確かめる前に動くので、他の人が送ると、値によらず 403 になる。勤怠の id のルートで勤怠がなければ、ここに来る前にルートモデルバインディングが 404 にする。
+     * 勤怠がない日のルート（ルートに勤怠がない）は、一般ユーザーはログインしている自分の日だけを扱い、管理者は admin のミドルウェアが守るので、ここでは確かめずに true を返す。
      *
      * @return bool 直してよいなら true
      */
     public function authorize(): bool
     {
-        return $this->user()->can('update', $this->route('attendanceRecord'));
+        $attendanceRecord = $this->route('attendanceRecord');
+
+        return $attendanceRecord === null || $this->user()->can('update', $attendanceRecord);
     }
 
     /**
