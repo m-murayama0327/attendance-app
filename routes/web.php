@@ -36,7 +36,7 @@ Route::middleware('admin')->group(function (): void {
     Route::get('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'show'])->whereNumber('attendance_correct_request_id');
     Route::post('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'approve'])->whereNumber('attendance_correct_request_id');
 });
-Route::middleware(['auth', 'general'])->group(function (): void {
+Route::middleware(['auth', 'general', 'verified'])->group(function (): void {
     Route::get('/attendance', [AttendanceController::class, 'index']);
     Route::post('/attendance', [AttendanceController::class, 'store']);
     Route::get('/attendance/list', [AttendanceController::class, 'list']);
@@ -45,7 +45,7 @@ Route::middleware(['auth', 'general'])->group(function (): void {
     Route::post('/attendance/date/{date}', [AttendanceController::class, 'updateDate']);
     Route::get('/application/{application}', [ApplicationController::class, 'show'])->whereNumber('application');
 });
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth', 'verified'])->group(function (): void {
     // 提供された Blade が一般ユーザーと管理者で同じパスを使うので、ログインしている人の役割を見て呼ぶコントローラーを分ける
     $callByRole = function (Request $request, string $generalController, string $adminController, string $method, array $parameters = []): mixed {
         $controller = $request->user()->admin_status ? $adminController : $generalController;
