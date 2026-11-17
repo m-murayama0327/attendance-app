@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ReportController;
 use App\Models\AttendanceRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -45,6 +46,7 @@ Route::middleware(['auth', 'general', 'verified'])->group(function (): void {
     Route::get('/attendance/date/{date}', [AttendanceController::class, 'showDate']);
     Route::post('/attendance/date/{date}', [AttendanceController::class, 'updateDate']);
     Route::get('/application/{application}', [ApplicationController::class, 'show'])->whereNumber('application');
+    Route::get('/attendance/report', [ReportController::class, 'index']);
 });
 Route::middleware(['auth', 'verified'])->group(function (): void {
     // 提供された Blade が一般ユーザーと管理者で同じパスを使うので、ログインしている人の役割を見て呼ぶコントローラーを分ける
