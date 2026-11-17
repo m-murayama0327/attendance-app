@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreAttendanceRecordRequest extends FormRequest
 {
@@ -19,6 +20,7 @@ class StoreAttendanceRecordRequest extends FormRequest
 
     /**
      * 勤怠の登録の決まりを返す。日付は、ログインしている人の同じ日の勤怠がないことも確かめる。
+     * 退勤は、形が誤っているときに出勤との前後まで比べてエラーを2つ出さないように、bail で最初のエラーで止める。
      *
      * @return array<string, array<int, mixed>> 入力項目ごとの決まり
      */
@@ -27,7 +29,7 @@ class StoreAttendanceRecordRequest extends FormRequest
         return [
             'date' => ['required', 'date_format:Y-m-d', Rule::unique('attendance_records')->where('user_id', $this->user()->id)],
             'clock_in' => ['required', 'date_format:H:i:s'],
-            'clock_out' => ['nullable', 'date_format:H:i:s', 'after:clock_in'],
+            'clock_out' => ['bail', 'nullable', 'date_format:H:i:s', 'after:clock_in'],
             'comment' => ['nullable', 'string', 'max:255'],
         ];
     }
@@ -50,5 +52,21 @@ class StoreAttendanceRecordRequest extends FormRequest
             'comment.string' => '備考は文字で指定してください。',
             'comment.max' => '備考は 255 文字以内で入力してください。',
         ];
+    }
+
+    /**
+     * rules() で確かめた後に、出勤にエラーがあれば、退勤の「出勤時刻より後」のエラーを消す。
+     * after:clock_in は出勤が正しくない形でも比べてエラーにするので、退勤が正しくても直すように読めてしまうため。
+     *
+     * @param  Validator  $validator  rules() で確かめた結果を持つバリデーター
+     * @return void 返す値はない
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->has('clock_in') && $validator->errors()->first('clock_out') === $this->messages()['clock_out.after']) {
+                $validator->errors()->forget('clock_out');
+            }
+        });
     }
 }
