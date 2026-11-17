@@ -342,6 +342,30 @@ class AttendanceRecord extends Model
     }
 
     /**
+     * 渡されたユーザーと月について、CSV に書く日ごとの行を返す。行の値は、ID、名前、日付、出勤、退勤、休憩、合計の順にする。
+     * 給与計算など他のシステムとつなぐときに人を見分けられるように、全部の行の先頭にユーザーの ID と名前を入れる。
+     * 休憩と合計は、画面と同じく `8:00` の形にする。勤怠のない日は、ID と名前と日付のほかを null のまま返す。
+     *
+     * @param  User  $user  勤怠を書き出すユーザー
+     * @param  Carbon  $month  書き出す月の中の日
+     * @return array<int, array<int, int|string|null>> 日ごとの行（ID、名前、日付、出勤、退勤、休憩、合計）
+     */
+    public static function csvRows(User $user, Carbon $month): array
+    {
+        return collect(self::monthlyRows($user, $month))
+            ->map(fn (array $row): array => [
+                $user->id,
+                $user->name,
+                $row['date'],
+                $row['clock_in'],
+                $row['clock_out'],
+                $row['total_break_time'] ? Carbon::parse($row['total_break_time'])->format('G:i') : null,
+                $row['total_time'] ? Carbon::parse($row['total_time'])->format('G:i') : null,
+            ])
+            ->all();
+    }
+
+    /**
      * ?date= の値を、その日の初めの時刻にして返す。値がないか読めないときは、今日にする。
      *
      * @param  mixed  $value  ?date= の値
