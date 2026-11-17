@@ -31,6 +31,7 @@ Route::middleware('admin')->group(function (): void {
     Route::get('/admin/attendance/staff/{id}', [AdminAttendanceController::class, 'staff'])->whereNumber('id');
     Route::get('/admin/attendance/staff/{id}/date/{date}', [AdminAttendanceController::class, 'showDate'])->whereNumber('id');
     Route::post('/admin/attendance/staff/{id}/date/{date}', [AdminAttendanceController::class, 'updateDate'])->whereNumber('id');
+    Route::post('/export', [AdminAttendanceController::class, 'export']);
     Route::get('/admin/attendance/{attendanceRecord}', [AdminAttendanceController::class, 'show'])->whereNumber('attendanceRecord');
     Route::get('/admin/staff/list', [StaffController::class, 'index']);
     Route::get('/stamp_correction_request/approve/{attendance_correct_request_id}', [AdminApplicationController::class, 'show'])->whereNumber('attendance_correct_request_id');
