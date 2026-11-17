@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AttendanceDetailRequest;
 use App\Models\AttendanceRecord;
 use App\Models\User;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttendanceController extends Controller
 {
@@ -58,6 +61,47 @@ class AttendanceController extends Controller
             'nextMonth' => $monthView['nextMonth'],
             'formattedAttendanceRecords' => AttendanceRecord::monthlyRows($user, $monthView['date']),
         ]);
+    }
+
+    /**
+     * 表示している一般ユーザーと月の勤怠を BOM 付きの UTF-8 の CSV でダウンロードさせる。
+     * 頼んでいない人や月のファイルを出さないように、数字でない ID、一般ユーザーでない人、存在しない月は 404 を返す。
+     *
+     * @param  Request  $request  届いたリクエスト（隠し項目の user_id と year_month）
+     * @return StreamedResponse CSV のダウンロード
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $userId = $request->input('user_id');
+        $yearMonth = $request->input('year_month');
+
+        if (! is_string($userId) || ! ctype_digit($userId) || ! is_string($yearMonth)) {
+            abort(404);
+        }
+
+        $user = User::general()->findOrFail($userId);
+
+        try {
+            $month = Carbon::createFromFormat('!Y-m', $yearMonth);
+        } catch (InvalidFormatException) {
+            abort(404);
+        }
+
+        if ($month->format('Y-m') !== $yearMonth) {
+            abort(404);
+        }
+
+        $rows = AttendanceRecord::csvRows($user, $month);
+
+        return response()->streamDownload(function () use ($rows): void {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['ID', '名前', '日付', '出勤', '退勤', '休憩', '合計']);
+            collect($rows)->each(function (array $row) use ($handle): void {
+                fputcsv($handle, $row);
+            });
+            fclose($handle);
+        }, "attendance_{$user->id}_{$yearMonth}.csv", ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**
