@@ -7,13 +7,29 @@ use App\Models\User;
 use Carbon\CarbonPeriod;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class AttendanceRecordSeeder extends Seeder
 {
+    // 要件で決まった user1 の当月の内訳。seedIntentionalData() は、この順に今日を除く最初の平日から日を割り当てる
+    private const CURRENT_MONTH_PATTERNS = [
+        // 通常
+        ['days' => 10, 'clock_in' => '09:00:00', 'clock_out' => '18:00:00'],
+        // 残業
+        ['days' => 3, 'clock_in' => '09:00:00', 'clock_out' => '20:00:00'],
+        // 遅刻
+        ['days' => 2, 'clock_in' => '09:30:00', 'clock_out' => '18:00:00'],
+        // 早退
+        ['days' => 1, 'clock_in' => '09:00:00', 'clock_out' => '17:00:00'],
+        // 長時間労働
+        ['days' => 1, 'clock_in' => '08:00:00', 'clock_out' => '21:00:00'],
+    ];
+
     /**
-     * 全員に、当月を含む直近6か月の今日より前の平日（土日を除く日で、祝日は含む）の勤怠を作る。
+     * user1 を除く全員について、当月を含む直近6か月の今日より前の平日（土日を除く日で、祝日は含む）の勤怠を作る。
      * 遅刻、早退、長時間労働、出勤と退勤と休憩の打刻漏れ、2回の休憩の日を、乱数を使わずに日付とユーザーで決まる値で混ぜる。
+     * user1 には、マイ勤怠レポートの予測値になる勤怠を作る。
      *
      * @return void 返す値はない
      */
@@ -23,7 +39,8 @@ class AttendanceRecordSeeder extends Seeder
         $weekdays = collect(CarbonPeriod::create(today()->startOfMonth()->subMonths(5), today()->subDay()))
             ->reject(fn (Carbon $date): bool => $date->isWeekend());
 
-        User::all()->each(function (User $user) use ($weekdays): void {
+        $user1 = User::where('email', 'user1@example.com')->firstOrFail();
+        User::whereKeyNot($user1->id)->get()->each(function (User $user) use ($weekdays): void {
             $weekdays->each(function (Carbon $date) use ($user): void {
                 $times = $this->resolveTimes($date->toDateString(), $user->id);
 
@@ -43,6 +60,8 @@ class AttendanceRecordSeeder extends Seeder
                 });
             });
         });
+
+        $this->seedIntentionalData($user1);
     }
 
     private function resolveTimes(string $date, int $userId): ?array
@@ -84,5 +103,57 @@ class AttendanceRecordSeeder extends Seeder
             // 通常の日
             default => ['clock_in' => $clockIn, 'clock_out' => $clockOut, 'breaks' => $breaks],
         };
+    }
+
+    /**
+     * user1 にマイ勤怠レポートの予測値になる勤怠を作る。
+     * 前の5か月は、各月の最初の平日15日を 9:00〜18:00 の通常の日にする。
+     * 当月は、今日を除く最初の平日に CURRENT_MONTH_PATTERNS の順で時刻を割り当てる。今日を除くのは user1 で今日の打刻を確かめられるようにするためで、今日より後の日も入る。
+     * どの日にも 12:00〜13:00 の休憩を付け、勤務時間とフラグを計算する。
+     *
+     * @param  User  $user1  意図的データを作るユーザー
+     * @return void 返す値はない
+     */
+    private function seedIntentionalData(User $user1): void
+    {
+        $firstOfMonth = today()->startOfMonth();
+
+        $pastDays = collect(range(5, 1))
+            ->flatMap(fn (int $monthsAgo): Collection => $this->pickWeekdays($firstOfMonth->copy()->subMonths($monthsAgo), 15))
+            ->map(fn (Carbon $date): array => ['date' => $date, 'clock_in' => '09:00:00', 'clock_out' => '18:00:00']);
+
+        // 選んだ日と同じ番目どうしで組み合わせられるように、内訳を日数分の行に広げる
+        $currentMonthTimes = collect(self::CURRENT_MONTH_PATTERNS)
+            ->flatMap(fn (array $pattern): array => array_fill(0, $pattern['days'], $pattern));
+        $currentMonthDays = $this->pickWeekdays($firstOfMonth, $currentMonthTimes->count())
+            ->map(fn (Carbon $date, int $index): array => ['date' => $date, 'clock_in' => $currentMonthTimes[$index]['clock_in'], 'clock_out' => $currentMonthTimes[$index]['clock_out']]);
+
+        $pastDays->concat($currentMonthDays)->each(function (array $day) use ($user1): void {
+            DB::transaction(function () use ($user1, $day): void {
+                $attendanceRecord = AttendanceRecord::create([
+                    'user_id' => $user1->id,
+                    'date' => $day['date']->toDateString(),
+                    'clock_in' => $day['clock_in'],
+                    'clock_out' => $day['clock_out'],
+                ]);
+                $attendanceRecord->breaks()->create(['break_in' => '12:00:00', 'break_out' => '13:00:00']);
+                $attendanceRecord->recalculate();
+            });
+        });
+    }
+
+    /**
+     * 指定した月について、土日と今日を除く平日を月の初めから数えて指定した日数だけ古い順に返す。祝日は平日に含む。
+     *
+     * @param  Carbon  $firstOfMonth  月の1日
+     * @param  int  $count  返す日数
+     * @return Collection<int, Carbon> 選んだ日
+     */
+    private function pickWeekdays(Carbon $firstOfMonth, int $count): Collection
+    {
+        return collect(CarbonPeriod::create($firstOfMonth, $firstOfMonth->copy()->endOfMonth()))
+            ->reject(fn (Carbon $date): bool => $date->isWeekend() || $date->isToday())
+            ->take($count)
+            ->values();
     }
 }
