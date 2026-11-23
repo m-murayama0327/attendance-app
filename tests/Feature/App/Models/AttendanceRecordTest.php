@@ -1104,6 +1104,81 @@ class AttendanceRecordTest extends TestCase
     }
 
     /**
+     * 退勤がない日は、CSV の行の合計が空になることを確かめる。
+     * 一般ユーザー（name が「山田太郎」）の退勤がない勤怠があるときに、テストから 2026-06 の日を渡して csvRows() を呼び、csvRows() が total_time の null を合計に null のまま入れて、2026-06-01 の行の7つ目（合計）が null で、4つ目（出勤）が 09:00、5つ目（退勤）と6つ目（休憩）が null かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_csv_rows_without_clock_out(): void
+    {
+        $user = User::factory()->create(['name' => '山田太郎', 'admin_status' => false]);
+        $this->createUserRecord($user, '09:00:00', null, []);
+
+        $rows = AttendanceRecord::csvRows($user, Carbon::parse('2026-06-01'));
+
+        $this->assertNull($rows[0][6]);
+        $this->assertSame('09:00', $rows[0][3]);
+        $this->assertNull($rows[0][4]);
+        $this->assertNull($rows[0][5]);
+    }
+
+    /**
+     * 休憩と退勤がある日は、CSV の行の休憩と合計が先頭の0のない時間の形になることを確かめる。
+     * 一般ユーザー（name が「山田太郎」）の休憩と退勤がある勤怠があるときに、テストから 2026-06 の日を渡して csvRows() を呼び、csvRows() が total_break_time と total_time の 01:00 の形を先頭の0のない形にして、2026-06-01 の行の6つ目（休憩）が 1:00、7つ目（合計）が 8:00 で、3つ目が 06/01(月)、4つ目が 09:00、5つ目が 18:00 かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_csv_rows_format_break_and_total(): void
+    {
+        $user = User::factory()->create(['name' => '山田太郎', 'admin_status' => false]);
+        $this->createUserRecord($user, '09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+
+        $rows = AttendanceRecord::csvRows($user, Carbon::parse('2026-06-01'));
+
+        $this->assertSame('1:00', $rows[0][5]);
+        $this->assertSame('8:00', $rows[0][6]);
+        $this->assertSame('06/01(月)', $rows[0][2]);
+        $this->assertSame('09:00', $rows[0][3]);
+        $this->assertSame('18:00', $rows[0][4]);
+    }
+
+    /**
+     * 休憩がない日は、CSV の行の休憩が空になることを確かめる。
+     * 一般ユーザー（name が「山田太郎」）の休憩がない勤怠があるときに、テストから 2026-06 の日を渡して csvRows() を呼び、csvRows() が total_break_time の null を休憩に null のまま入れて、2026-06-01 の行の6つ目（休憩）が null で、7つ目（合計）が 9:00 かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_csv_rows_without_break(): void
+    {
+        $user = User::factory()->create(['name' => '山田太郎', 'admin_status' => false]);
+        $this->createUserRecord($user, '09:00:00', '18:00:00', []);
+
+        $rows = AttendanceRecord::csvRows($user, Carbon::parse('2026-06-01'));
+
+        $this->assertNull($rows[0][5]);
+        $this->assertSame('9:00', $rows[0][6]);
+    }
+
+    /**
+     * 勤怠のない日も含めて、CSV の全部の行の先頭に渡したユーザーの id と name が入ることを確かめる。
+     * テストから 2026-06 の勤怠がない一般ユーザーと 2026-06 の日を渡して csvRows() を呼び、csvRows() が勤怠のない日も含めて全部の行の先頭に渡したユーザーの id と name を入れて、30行の全部で1つ目が渡したユーザーの id、2つ目が「山田太郎」で、3つ目が 06/01(月) などの日付、4つ目から7つ目が null かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_csv_rows_start_with_user_id_and_name(): void
+    {
+        $user = User::factory()->create(['name' => '山田太郎', 'admin_status' => false]);
+
+        $rows = AttendanceRecord::csvRows($user, Carbon::parse('2026-06-01'));
+
+        $this->assertCount(30, $rows);
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[0] === $user->id && $row[1] === '山田太郎'));
+        $this->assertSame('06/01(月)', $rows[0][2]);
+        $this->assertSame('06/30(火)', $rows[29][2]);
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => array_slice($row, 3) === [null, null, null, null]));
+    }
+
+    /**
      * 開く日が 2026-06-01 で ?date= がないなら、管理者の勤怠一覧に「2026/06/01」が出ることを確かめる。
      * 管理者が 2026-06-01 に GET /admin/attendance/list を開き、parseDateQuery() が今日を返して、$previousDay が 2026-05-31、$nextDay が 2026-06-02 かを見る。
      *
@@ -1748,6 +1823,27 @@ class AttendanceRecordTest extends TestCase
         $attendanceRecord->breaks()->createMany($breaks);
 
         return $attendanceRecord;
+    }
+
+    /**
+     * csvRows() のテストに使う勤怠として、渡したユーザーの 2026-06-01 の勤怠を渡した出勤、退勤、休憩で作り、recalculate() で計算する。
+     *
+     * @param  User  $user  勤怠の持ち主の一般ユーザー
+     * @param  string  $clockIn  出勤（例：09:00:00）
+     * @param  string|null  $clockOut  退勤（退勤がないときは null）
+     * @param  array<int, array{break_in: string, break_out: string}>  $breaks  作る休憩の行
+     * @return void 返す値はない
+     */
+    private function createUserRecord(User $user, string $clockIn, ?string $clockOut, array $breaks): void
+    {
+        $attendanceRecord = AttendanceRecord::factory()->create([
+            'user_id' => $user->id,
+            'date' => '2026-06-01',
+            'clock_in' => $clockIn,
+            'clock_out' => $clockOut,
+        ]);
+        $attendanceRecord->breaks()->createMany($breaks);
+        $attendanceRecord->recalculate();
     }
 
     /**

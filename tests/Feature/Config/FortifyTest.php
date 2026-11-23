@@ -3,8 +3,11 @@
 namespace Tests\Feature\Config;
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class FortifyTest extends TestCase
@@ -96,5 +99,59 @@ class FortifyTest extends TestCase
         $response = $this->actingAs($user)->post('/user/two-factor-authentication');
 
         $response->assertNotFound();
+    }
+
+    /**
+     * 未認証の一般ユーザーがメール認証誘導画面を開けることを確かめる。
+     * 未認証の一般ユーザーが GET /email/verify を開き、features が Features::emailVerification() でメール認証誘導画面のルートを置いて、200 で auth.verify-email を出すかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_verify_email_route_exists(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->get('/email/verify');
+
+        $response->assertOk();
+        $response->assertViewIs('auth.verify-email');
+    }
+
+    /**
+     * 認証メールのリンクを開くと、そのユーザーのメール認証が済むことを確かめる。
+     * 未認証の一般ユーザーが自分の署名つきの認証のリンクの GET /email/verify/{id}/{hash} を開き、features が Features::emailVerification() でメール認証を済ませるルートを置いて、そのユーザーの email_verified_at が入り、/attendance に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_verify_link_route_marks_email_verified(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+        $verificationUrl = URL::temporarySignedRoute('verification.verify', now()->addMinutes(60), [
+            'id' => $user->id,
+            'hash' => sha1($user->getEmailForVerification()),
+        ]);
+
+        $response = $this->actingAs($user)->get($verificationUrl);
+
+        $response->assertRedirect('/attendance');
+        $this->assertNotNull($user->fresh()->email_verified_at);
+    }
+
+    /**
+     * 未認証の一般ユーザーが認証メールの再送を頼むと、そのユーザーに VerifyEmail の通知が送られることを確かめる。
+     * 未認証の一般ユーザーが /email/verify から POST /email/verification-notification を送り、features が Features::emailVerification() で認証メールを再送するルートを置いて、そのユーザーに VerifyEmail の通知が1通送られ、/email/verify に移り、セッションの message が「認証メールを再送しました」になるかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_verification_notification_route_sends_mail(): void
+    {
+        Notification::fake();
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->from('/email/verify')->post('/email/verification-notification');
+
+        $response->assertRedirect('/email/verify');
+        Notification::assertSentToTimes($user, VerifyEmail::class, 1);
+        $response->assertSessionHas('message', '認証メールを再送しました');
     }
 }

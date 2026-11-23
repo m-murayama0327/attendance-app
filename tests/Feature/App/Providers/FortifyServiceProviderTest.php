@@ -174,6 +174,24 @@ class FortifyServiceProviderTest extends TestCase
     }
 
     /**
+     * メール認証誘導画面では、リンクの送り先がメール認証サイトになることを確かめる。
+     * 未認証の一般ユーザーが GET /email/verify を開き、boot() の verifyEmailView() がメール認証誘導画面に auth.verify-email を出して、「認証はこちらから」のリンクの送り先が http://localhost:8025 で、200 で auth.verify-email を出し、再送のフォームの送り先が /email/verification-notification かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_verify_email_page_is_shown(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->get('/email/verify');
+
+        $response->assertOk();
+        $response->assertSee('href="http://localhost:8025"', false);
+        $response->assertViewIs('auth.verify-email');
+        $response->assertSee('action="'.url('/email/verification-notification').'"', false);
+    }
+
+    /**
      * メールが wrong@example.com なら、email に「ログイン情報が登録されていません」が出ることを確かめる。
      * 一般ユーザーと管理者がいるときに、POST /login に wrong@example.com と password を送り、boot() の照合が null を返して、email にエラーが出て、ログインしていないかを見る。
      *
