@@ -20,8 +20,9 @@ class AttendanceRecordFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
-            // 同じ人で何行作っても user_id と date のユニーク制約に当たらないように、日付は重ならない値にする
-            'date' => fake()->unique()->dateTimeBetween('-1 year', 'yesterday')->format('Y-m-d'),
+            // user_id と date にはユニーク制約がある。そのため、同じ人の勤怠を何行作っても、日付が重ならないようにする。
+            // unique() は日時ではなく日数に付ける。日時に付けると、秒が違うだけの同じ日付が通る。
+            'date' => today()->subDays(fake()->unique()->numberBetween(1, 365))->toDateString(),
             'clock_in' => '09:00:00',
             'clock_out' => '18:00:00',
         ];
