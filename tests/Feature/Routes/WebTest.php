@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\AttendanceBreak;
 use App\Models\AttendanceRecord;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Testing\TestResponse;
@@ -202,6 +203,21 @@ class WebTest extends TestCase
     }
 
     /**
+     * 一般ユーザーは勤怠を CSV でダウンロードできないことを確かめる。
+     * 一般ユーザーが POST /export で user_id に一般ユーザーの id と year_month に 2026-06 を送り、ルートの行がグループに付けた admin で一般ユーザーを止めて、403 を返すかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_user_gets_forbidden_on_export(): void
+    {
+        $user = User::factory()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->post('/export', ['user_id' => $user->id, 'year_month' => '2026-06']);
+
+        $response->assertForbidden();
+    }
+
+    /**
      * 開いた番号の勤怠がない（999）なら、GET /admin/attendance/999 が 404 になることを確かめる。
      * 番号 999 の勤怠がないときに、管理者が GET /admin/attendance/999 を送り、ルートの行がルートモデルバインディングで勤怠を探して、404 を返すかを見る。
      *
@@ -376,6 +392,21 @@ class WebTest extends TestCase
     }
 
     /**
+     * メール認証がまだの一般ユーザーは、勤怠登録の画面を開けずにメール認証の画面に移ることを確かめる。
+     * メール認証がまだの一般ユーザーが GET /attendance を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_redirects_to_verify_attendance_page(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->get('/attendance');
+
+        $response->assertRedirect('/email/verify');
+    }
+
+    /**
      * 送る人がログインしていない人なら、POST /attendance に action=clock_in を送っても勤怠ができないことを確かめる。
      * ログインしていない人が POST /attendance に action=clock_in を送り、ルートの行がグループに付けた auth でログインしていない人を止めて、/login に移り勤怠ができないかを見る。
      *
@@ -406,6 +437,22 @@ class WebTest extends TestCase
     }
 
     /**
+     * メール認証がまだの一般ユーザーは、出勤を打刻しても勤怠ができずにメール認証の画面に移ることを確かめる。
+     * メール認証がまだの一般ユーザーが POST /attendance に action=clock_in を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、勤怠ができず、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_cannot_stamp(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->post('/attendance', ['action' => 'clock_in']);
+
+        $response->assertRedirect('/email/verify');
+        $this->assertDatabaseCount('attendance_records', 0);
+    }
+
+    /**
      * 開く人がログインしていない人なら、GET /attendance/list で /login に移ることを確かめる。
      * ログインしていない人が GET /attendance/list を送り、ルートの行がグループに付けた auth でログインしていない人を止めて、/login に移るかを見る。
      *
@@ -431,6 +478,21 @@ class WebTest extends TestCase
         $response = $this->actingAs($admin)->get('/attendance/list');
 
         $response->assertForbidden();
+    }
+
+    /**
+     * メール認証がまだの一般ユーザーは、勤怠一覧の画面を開けずにメール認証の画面に移ることを確かめる。
+     * メール認証がまだの一般ユーザーが GET /attendance/list を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_redirects_to_verify_attendance_list(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->get('/attendance/list');
+
+        $response->assertRedirect('/email/verify');
     }
 
     /**
@@ -516,6 +578,22 @@ class WebTest extends TestCase
     }
 
     /**
+     * メール認証がまだの一般ユーザーは、別名のルートで勤怠詳細の画面を開けずにメール認証の画面に移ることを確かめる。
+     * 自分の勤怠（2026-06-01、09:00〜18:00）があるときに、メール認証がまだの一般ユーザーが GET /attendance/detail/{id} を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_redirects_to_verify_on_alias(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+        $attendanceRecord = AttendanceRecord::factory()->create(['user_id' => $user->id, 'date' => '2026-06-01', 'clock_in' => '09:00:00', 'clock_out' => '18:00:00']);
+
+        $response = $this->actingAs($user)->get('/attendance/detail/'.$attendanceRecord->id);
+
+        $response->assertRedirect('/email/verify');
+    }
+
+    /**
      * 開く人がログインしていない人なら、GET /attendance/date/2026-06-02 で /login に移ることを確かめる。
      * ログインしていない人が GET /attendance/date/2026-06-02 を送り、ルートの行がグループに付けた auth でログインしていない人を止めて、/login に移るかを見る。
      *
@@ -541,6 +619,22 @@ class WebTest extends TestCase
         $response = $this->actingAs($admin)->get('/attendance/date/2026-06-02');
 
         $response->assertForbidden();
+    }
+
+    /**
+     * メール認証がまだの一般ユーザーは、勤怠がない日の勤怠詳細の画面を開けずにメール認証の画面に移ることを確かめる。
+     * 2026-06-03 に、メール認証がまだの一般ユーザーが GET /attendance/date/2026-06-02 を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_redirects_to_verify_on_date(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-03 10:00:00'));
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->get('/attendance/date/2026-06-02');
+
+        $response->assertRedirect('/email/verify');
     }
 
     /**
@@ -582,6 +676,29 @@ class WebTest extends TestCase
         ]);
 
         $response->assertForbidden();
+        $this->assertDatabaseCount('applications', 0);
+    }
+
+    /**
+     * メール認証がまだの一般ユーザーは、勤怠がない日の修正申請ができずにメール認証の画面に移ることを確かめる。
+     * 2026-06-03 に、メール認証がまだの一般ユーザーが POST /attendance/date/2026-06-02 に出勤 09:00、退勤 18:00、休憩1行 12:00〜13:00、備考「打刻漏れのため」を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、申請ができず、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_cannot_submit_on_date(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-03 10:00:00'));
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->post('/attendance/date/2026-06-02', [
+            'new_clock_in' => '09:00',
+            'new_clock_out' => '18:00',
+            'new_break_in' => ['12:00'],
+            'new_break_out' => ['13:00'],
+            'comment' => '打刻漏れのため',
+        ]);
+
+        $response->assertRedirect('/email/verify');
         $this->assertDatabaseCount('applications', 0);
     }
 
@@ -646,6 +763,65 @@ class WebTest extends TestCase
         $response = $this->actingAs($admin)->get('/application/abc');
 
         $response->assertNotFound();
+    }
+
+    /**
+     * メール認証がまだの一般ユーザーは、申請詳細の画面を開けずにメール認証の画面に移ることを確かめる。
+     * 自分の申請があるときに、メール認証がまだの一般ユーザーが GET /application/{id} を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_redirects_to_verify_application_detail(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+        $application = Application::factory()->create(['user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get('/application/'.$application->id);
+
+        $response->assertRedirect('/email/verify');
+    }
+
+    /**
+     * ログインしていない人は、マイ勤怠レポートの画面を開けずにログインの画面に移ることを確かめる。
+     * ログインしていない人が GET /attendance/report を送り、ルートの行がグループに付けた auth でログインしていない人を止めて、/login に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_guest_redirects_to_login_report(): void
+    {
+        $response = $this->get('/attendance/report');
+
+        $response->assertRedirect('/login');
+    }
+
+    /**
+     * メール認証がまだの一般ユーザーは、マイ勤怠レポートの画面を開けずにメール認証の画面に移ることを確かめる。
+     * メール認証がまだの一般ユーザーが GET /attendance/report を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_redirects_to_verify_report(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->get('/attendance/report');
+
+        $response->assertRedirect('/email/verify');
+    }
+
+    /**
+     * 管理者はマイ勤怠レポートの画面を開けないことを確かめる。
+     * 管理者が GET /attendance/report を送り、ルートの行がグループに付けた general で管理者を止めて、403 を返すかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_admin_gets_forbidden_report(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+
+        $response = $this->actingAs($admin)->get('/attendance/report');
+
+        $response->assertForbidden();
     }
 
     /**
@@ -785,6 +961,22 @@ class WebTest extends TestCase
     }
 
     /**
+     * メール認証がまだの一般ユーザーは、勤怠がある日の勤怠詳細の画面を開けずにメール認証の画面に移ることを確かめる。
+     * 自分の勤怠（2026-06-01、09:00〜18:00）があるときに、メール認証がまだの一般ユーザーが GET /attendance/{id} を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_redirects_to_verify_attendance_detail(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+        $attendanceRecord = AttendanceRecord::factory()->create(['user_id' => $user->id, 'date' => '2026-06-01', 'clock_in' => '09:00:00', 'clock_out' => '18:00:00']);
+
+        $response = $this->actingAs($user)->get('/attendance/'.$attendanceRecord->id);
+
+        $response->assertRedirect('/email/verify');
+    }
+
+    /**
      * 送った番号の勤怠がない（999）なら、POST /attendance/999 が 404 になることを確かめる。
      * 番号 999 の勤怠がないときに、一般ユーザーが POST /attendance/999 に出勤 09:00 と退勤 18:00 などを送り、ルートの行がルートモデルバインディングで勤怠を探して、404 を返し申請ができないかを見る。
      *
@@ -850,6 +1042,29 @@ class WebTest extends TestCase
     }
 
     /**
+     * メール認証がまだの一般ユーザーは、勤怠がある日の修正申請ができずにメール認証の画面に移ることを確かめる。
+     * 自分の勤怠（2026-06-01、09:00〜18:00）があるときに、メール認証がまだの一般ユーザーが POST /attendance/{id} に出勤 09:00、退勤 18:00、休憩1行 12:00〜13:00、備考「休憩の打刻漏れのため」を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、申請ができず、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_cannot_apply(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+        $attendanceRecord = AttendanceRecord::factory()->create(['user_id' => $user->id, 'date' => '2026-06-01', 'clock_in' => '09:00:00', 'clock_out' => '18:00:00']);
+
+        $response = $this->actingAs($user)->post('/attendance/'.$attendanceRecord->id, [
+            'new_clock_in' => '09:00',
+            'new_clock_out' => '18:00',
+            'new_break_in' => ['12:00'],
+            'new_break_out' => ['13:00'],
+            'comment' => '休憩の打刻漏れのため',
+        ]);
+
+        $response->assertRedirect('/email/verify');
+        $this->assertDatabaseCount('applications', 0);
+    }
+
+    /**
      * 開く人がログインしていない人なら、GET /stamp_correction_request/list で /login に移ることを確かめる。
      * ログインしていない人が GET /stamp_correction_request/list を送り、ルートの行がグループに付けた auth でログインしていない人を止めて、/login に移るかを見る。
      *
@@ -860,5 +1075,20 @@ class WebTest extends TestCase
         $response = $this->get('/stamp_correction_request/list');
 
         $response->assertRedirect('/login');
+    }
+
+    /**
+     * メール認証がまだの一般ユーザーは、申請一覧の画面を開けずにメール認証の画面に移ることを確かめる。
+     * メール認証がまだの一般ユーザーが GET /stamp_correction_request/list を送り、ルートの行がグループに付けた verified でメール認証がまだの一般ユーザーを止めて、/email/verify に移るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_unverified_user_redirects_to_verify_application_list(): void
+    {
+        $user = User::factory()->unverified()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($user)->get('/stamp_correction_request/list');
+
+        $response->assertRedirect('/email/verify');
     }
 }
