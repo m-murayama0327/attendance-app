@@ -6,14 +6,41 @@ use App\Models\Application;
 use App\Models\AttendanceBreak;
 use App\Models\AttendanceRecord;
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class UserTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * 会員登録をすると、登録したユーザーに VerifyEmail の通知が送られることを確かめる。
+     * ログインしていない人が POST /register に送り、クラスの宣言の implements MustVerifyEmail で Laravel が登録の後に認証メールを送るようにして、登録したユーザーに VerifyEmail の通知が1通送られ、ユーザーが1行でき、email_verified_at が null で、/attendance に移り、ログインした状態になるかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_verification_mail_is_sent_after_register(): void
+    {
+        Notification::fake();
+
+        $response = $this->post('/register', [
+            'name' => '山田太郎',
+            'email' => 'yamada@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ]);
+
+        $user = User::where('email', 'yamada@example.com')->first();
+        $response->assertRedirect('/attendance');
+        Notification::assertSentToTimes($user, VerifyEmail::class, 1);
+        $this->assertDatabaseCount('users', 1);
+        $this->assertNull($user->email_verified_at);
+        $this->assertAuthenticatedAs($user);
+    }
 
     /**
      * fill() に admin_status を true で渡しても、admin_status が入らず、null のままであることを確かめる。
