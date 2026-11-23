@@ -119,6 +119,208 @@ class AttendanceControllerTest extends TestCase
     }
 
     /**
+     * 管理者が出力した CSV の見出しの次に勤怠の行が書かれることを確かめる。
+     * 一般ユーザーの 2026-06-01 の勤怠（09:00〜18:00、休憩 12:00〜13:00）があるときに、管理者が POST /export で user_id にその人の id、year_month に 2026-06 を送り、export() が AttendanceRecord.php の csvRows() が返した行を見出しの行の後に1行ずつ CSV に書いて、200 で見出しの次の行が「その人の id,山田太郎,06/01(月),09:00,18:00,1:00,8:00」かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_writes_rows_from_csv_rows(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+        $user = User::factory()->create(['admin_status' => false, 'name' => '山田太郎']);
+        $attendanceRecord = AttendanceRecord::factory()->create([
+            'user_id' => $user->id,
+            'date' => '2026-06-01',
+            'clock_in' => '09:00:00',
+            'clock_out' => '18:00:00',
+        ]);
+        AttendanceBreak::factory()->create([
+            'attendance_record_id' => $attendanceRecord->id,
+            'break_in' => '12:00:00',
+            'break_out' => '13:00:00',
+        ]);
+        $attendanceRecord->recalculate();
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => (string) $user->id, 'year_month' => '2026-06']);
+
+        $response->assertOk();
+        $lines = explode("\n", $response->streamedContent());
+        $this->assertSame($user->id.',山田太郎,06/01(月),09:00,18:00,1:00,8:00', $lines[1]);
+    }
+
+    /**
+     * 管理者が一般ユーザーの1か月分の勤怠を CSV でダウンロードできることを確かめる。
+     * 管理者が POST /export で user_id に一般ユーザーの id、year_month に 2026-06 を送り、export() が送った一般ユーザーと月の勤怠を BOM 付きの UTF-8 の CSV にしてダウンロードさせ、200 で、ファイル名が attendance_{id}_2026-06.csv、Content-Type が text/csv; charset=UTF-8、中身の先頭が BOM（EF BB BF）、1行目が ID,名前,日付,出勤,退勤,休憩,合計 になり、見出しの次の行が 06/01 の行で、見出しの後に 2026-06 の30日分の行があるかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_downloads_csv(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+        $user = User::factory()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => (string) $user->id, 'year_month' => '2026-06']);
+
+        $response->assertOk();
+        $response->assertDownload('attendance_'.$user->id.'_2026-06.csv');
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $content = $response->streamedContent();
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
+        $lines = explode("\n", rtrim(substr($content, 3), "\n"));
+        $this->assertSame('ID,名前,日付,出勤,退勤,休憩,合計', $lines[0]);
+        $this->assertStringContainsString(',06/01(月),', $lines[1]);
+        $this->assertCount(30, array_slice($lines, 1));
+    }
+
+    /**
+     * CSV の出力で、user_id の一般ユーザーがいないと、ページがないと返すことを確かめる。
+     * 管理者が POST /export で user_id に 999、year_month に 2026-06 を送り、export() が一般ユーザーの中から user_id で探して、見つからないので 404 が返るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_missing_user_returns_not_found(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => '999', 'year_month' => '2026-06']);
+
+        $response->assertNotFound();
+    }
+
+    /**
+     * CSV の出力で、user_id が管理者の id だと、ページがないと返すことを確かめる。
+     * 管理者が POST /export で user_id に管理者の id、year_month に 2026-06 を送り、export() が一般ユーザーだけを探して（User::general()）、管理者の id も見つからない id として 404 が返るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_admin_user_returns_not_found(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => (string) $admin->id, 'year_month' => '2026-06']);
+
+        $response->assertNotFound();
+    }
+
+    /**
+     * CSV の出力で、user_id が数字でないと、ページがないと返すことを確かめる。
+     * 管理者が POST /export で user_id に一般ユーザーの id の後ろに abc を付けた値、year_month に 2026-06 を送り、export() が数字だけでできていない user_id を止めて（ctype_digit()）、404 が返るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_non_numeric_user_id_returns_not_found(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+        $user = User::factory()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => $user->id.'abc', 'year_month' => '2026-06']);
+
+        $response->assertNotFound();
+    }
+
+    /**
+     * CSV の出力で、year_month が年月として読めないと、ページがないと返すことを確かめる。
+     * 管理者が POST /export で user_id に一般ユーザーの id、year_month に abc を送り、export() が年月として読めない year_month の InvalidFormatException を受けて、404 が返るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_malformed_month_returns_not_found(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+        $user = User::factory()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => (string) $user->id, 'year_month' => 'abc']);
+
+        $response->assertNotFound();
+    }
+
+    /**
+     * CSV の出力で、year_month がない月だと、ページがないと返すことを確かめる。
+     * 管理者が POST /export で user_id に一般ユーザーの id、year_month に 2026-13 を送り、export() が読んだ月を年月の形に戻した値（2027-01）と送った値を比べて、違うので 404 が返るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_nonexistent_month_returns_not_found(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+        $user = User::factory()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => (string) $user->id, 'year_month' => '2026-13']);
+
+        $response->assertNotFound();
+    }
+
+    /**
+     * CSV の出力で、year_month が配列だと、ページがないと返すことを確かめる。
+     * 管理者が POST /export で user_id に一般ユーザーの id、year_month に配列を送り、export() が文字でない year_month を止めて（is_string()）、404 が返るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_array_month_returns_not_found(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+        $user = User::factory()->create(['admin_status' => false]);
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => (string) $user->id, 'year_month' => ['2026-06']]);
+
+        $response->assertNotFound();
+    }
+
+    /**
+     * 送った一般ユーザーの CSV に他の一般ユーザーの勤怠が出ないことを確かめる。
+     * 一般ユーザー B の 2026-06-01 の勤怠（07:15〜16:45）だけがあるときに、管理者が POST /export で user_id に A の id、year_month に 2026-06 を送り、export() が送った user_id の人を csvRows() に渡して、200 で CSV に 07:15 と 16:45 が出ず、06/01 の行の時刻が空かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_excludes_other_users_records(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+        $user = User::factory()->create(['admin_status' => false, 'name' => '山田太郎']);
+        $otherUser = User::factory()->create(['admin_status' => false]);
+        AttendanceRecord::factory()->create([
+            'user_id' => $otherUser->id,
+            'date' => '2026-06-01',
+            'clock_in' => '07:15:00',
+            'clock_out' => '16:45:00',
+        ]);
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => (string) $user->id, 'year_month' => '2026-06']);
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+        $this->assertStringNotContainsString('07:15', $content);
+        $this->assertStringNotContainsString('16:45', $content);
+        $lines = explode("\n", $content);
+        $this->assertSame($user->id.',山田太郎,06/01(月),,,,', $lines[1]);
+    }
+
+    /**
+     * 送った月の CSV に同じ人の他の月の勤怠が出ないことを確かめる。
+     * 一般ユーザーの 2026-05-29 の勤怠（07:15〜16:45）だけがあるときに、管理者が POST /export で user_id にその人の id、year_month に 2026-06 を送り、export() が送った year_month の月を csvRows() に渡して、200 で CSV に 06/01 の行が出て、05/29 の行と 07:15 が出ないかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_export_excludes_other_months_records(): void
+    {
+        $admin = User::factory()->create(['admin_status' => true]);
+        $user = User::factory()->create(['admin_status' => false]);
+        AttendanceRecord::factory()->create([
+            'user_id' => $user->id,
+            'date' => '2026-05-29',
+            'clock_in' => '07:15:00',
+            'clock_out' => '16:45:00',
+        ]);
+
+        $response = $this->actingAs($admin)->post('/export', ['user_id' => (string) $user->id, 'year_month' => '2026-06']);
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+        $this->assertStringContainsString('06/01(月)', $content);
+        $this->assertStringNotContainsString('05/29', $content);
+        $this->assertStringNotContainsString('07:15', $content);
+    }
+
+    /**
      * 勤怠の承認待ちの申請があっても、読み取り専用にならずに修正のフォームが出ることを確かめる。
      * 一般ユーザーの勤怠に承認待ちの申請があるときに、管理者が GET /attendance/{id} を送り、renderDetail() が申請を見ずに、200 で admin.admin-detail が返り、修正のフォームが出て、承認待ちの文が出ないかを見る。
      *
