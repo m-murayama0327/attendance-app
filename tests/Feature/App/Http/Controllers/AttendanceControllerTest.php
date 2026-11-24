@@ -303,7 +303,7 @@ class AttendanceControllerTest extends TestCase
         $response->assertSee('name="new_clock_out" value=""', false);
         $response->assertSee('name="new_break_in[0]" value=""', false);
         $response->assertSee('name="new_break_out[0]" value=""', false);
-        $response->assertSee('id="comment" name="comment" value=""', false);
+        $response->assertSee('id="comment" name="comment"></textarea>', false);
     }
 
     /**
@@ -328,7 +328,7 @@ class AttendanceControllerTest extends TestCase
         $response->assertSee('name="new_clock_out" value=""', false);
         $response->assertSee('name="new_break_in[0]" value=""', false);
         $response->assertSee('name="new_break_out[0]" value=""', false);
-        $response->assertSee('id="comment" name="comment" value=""', false);
+        $response->assertSee('id="comment" name="comment"></textarea>', false);
     }
 
     /**

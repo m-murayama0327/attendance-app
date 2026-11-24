@@ -1602,7 +1602,7 @@ class AttendanceRecordTest extends TestCase
         $response = $this->actingAs($user)->get('/attendance/'.$attendanceRecord->id);
 
         $response->assertSee('id="new_clock_in" type="text" name="new_clock_in" value="10:00"', false);
-        $response->assertSee('id="comment" name="comment" value=""', false);
+        $response->assertSee('id="comment" name="comment"></textarea>', false);
     }
 
     /**
