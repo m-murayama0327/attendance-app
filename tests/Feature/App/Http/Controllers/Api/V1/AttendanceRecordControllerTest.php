@@ -9,6 +9,7 @@ use App\Models\ProposalBreak;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use RuntimeException;
 use Tests\TestCase;
 
 class AttendanceRecordControllerTest extends TestCase
@@ -448,6 +449,32 @@ class AttendanceRecordControllerTest extends TestCase
 
         $response->assertOk();
         $this->assertDatabaseHas('attendance_records', ['id' => $attendanceRecord->id, 'user_id' => $user->id]);
+    }
+
+    /**
+     * 勤怠を消した後に処理が失敗したら、同じ人と日付の申請の削除も元に戻ることを確かめる。
+     * 持ち主の 2026-06-01 の勤怠と同じ人と日付の承認待ちの申請があり、勤怠を消した直後に例外を投げる処理を足したときに、持ち主が Sanctum::actingAs() で DELETE /api/v1/attendance-records/{id} を送り、destroy() が DB::transaction() で申請と勤怠の削除をまとめて、例外が起き、申請の行と勤怠の行が残るかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_delete_rolls_back_applications_on_failure(): void
+    {
+        $user = User::factory()->create(['admin_status' => false]);
+        $attendanceRecord = AttendanceRecord::factory()->create(['user_id' => $user->id, 'date' => '2026-06-01']);
+        $application = Application::factory()->create(['user_id' => $user->id, 'date' => '2026-06-01']);
+        AttendanceRecord::deleted(function (): void {
+            throw new RuntimeException('勤怠を消した後の失敗');
+        });
+        Sanctum::actingAs($user);
+        $this->withoutExceptionHandling();
+
+        $this->assertThrows(
+            fn () => $this->deleteJson('/api/v1/attendance-records/'.$attendanceRecord->id),
+            RuntimeException::class,
+            '勤怠を消した後の失敗'
+        );
+        $this->assertDatabaseHas('applications', ['id' => $application->id]);
+        $this->assertDatabaseHas('attendance_records', ['id' => $attendanceRecord->id]);
     }
 
     /**
