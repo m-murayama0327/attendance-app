@@ -347,6 +347,7 @@ class AttendanceRecord extends Model
      * 渡されたユーザーと月について、CSV に書く日ごとの行を返す。行の値は、ID、名前、日付、出勤、退勤、休憩、合計の順にする。
      * 給与計算など他のシステムとつなぐときに人を見分けられるように、全部の行の先頭にユーザーの ID と名前を入れる。
      * 休憩と合計は、画面と同じく `8:00` の形にする。勤怠のない日は、ID と名前と日付のほかを null のまま返す。
+     * 名前が `=`、`+`、`-`、`@` で始まるときは、表計算ソフトが数式として動かさないように、先頭にタブを付ける。
      *
      * @param  User  $user  勤怠を書き出すユーザー
      * @param  Carbon  $month  書き出す月の中の日
@@ -357,7 +358,7 @@ class AttendanceRecord extends Model
         return collect(self::monthlyRows($user, $month))
             ->map(fn (array $row): array => [
                 $user->id,
-                $user->name,
+                self::escapeFormula($user->name),
                 $row['date'],
                 $row['clock_in'],
                 $row['clock_out'],
@@ -565,5 +566,22 @@ class AttendanceRecord extends Model
         [$hours, $minutes] = explode(':', $time);
 
         return (int) $hours * 60 + (int) $minutes;
+    }
+
+    /**
+     * 渡された文字が `=`、`+`、`-`、`@` で始まるときは、先頭にタブを付けて返す。それ以外は、そのまま返す。
+     * 先頭にタブがあると、表計算ソフトは値を数式ではなく文字として扱う。
+     * タブと改行で始まる値は数えない。名前の前後の空白（タブと改行も入る）は、Laravel の初期のミドルウェアの `TrimStrings` が消すので、タブと改行で始まる名前は入らない。
+     *
+     * @param  string  $value  CSV に書く文字
+     * @return string 数式にならないようにした文字
+     */
+    private static function escapeFormula(string $value): string
+    {
+        if (in_array(substr($value, 0, 1), ['=', '+', '-', '@'], true)) {
+            return "\t".$value;
+        }
+
+        return $value;
     }
 }
