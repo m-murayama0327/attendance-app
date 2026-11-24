@@ -1828,6 +1828,91 @@ class AttendanceRecordTest extends TestCase
     }
 
     /**
+     * 名前が等号で始まるなら、CSV の名前の先頭に数式を止める文字が付くことを確かめる。
+     * テストから名前が =1+1 の一般ユーザーと 2026-06 の日を渡して csvRows() を呼び、escapeFormula() が名前の1文字目を見てタブを付けて、30行の全部で2つ目がタブを付けた =1+1 かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_csv_rows_escape_name_starting_with_equals(): void
+    {
+        $user = User::factory()->create(['name' => '=1+1', 'admin_status' => false]);
+
+        $rows = AttendanceRecord::csvRows($user, Carbon::parse('2026-06-01'));
+
+        $this->assertCount(30, $rows);
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[1] === "\t=1+1"));
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[0] === $user->id));
+    }
+
+    /**
+     * 名前がプラス記号で始まるなら、CSV の名前の先頭に数式を止める文字が付くことを確かめる。
+     * テストから名前が +1+1 の一般ユーザーと 2026-06 の日を渡して csvRows() を呼び、escapeFormula() が名前の1文字目を見てタブを付けて、30行の全部で2つ目がタブを付けた +1+1 かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_csv_rows_escape_name_starting_with_plus(): void
+    {
+        $user = User::factory()->create(['name' => '+1+1', 'admin_status' => false]);
+
+        $rows = AttendanceRecord::csvRows($user, Carbon::parse('2026-06-01'));
+
+        $this->assertCount(30, $rows);
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[1] === "\t+1+1"));
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[0] === $user->id));
+    }
+
+    /**
+     * 名前がマイナス記号で始まるなら、CSV の名前の先頭に数式を止める文字が付くことを確かめる。
+     * テストから名前が -1+1 の一般ユーザーと 2026-06 の日を渡して csvRows() を呼び、escapeFormula() が名前の1文字目を見てタブを付けて、30行の全部で2つ目がタブを付けた -1+1 かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_csv_rows_escape_name_starting_with_minus(): void
+    {
+        $user = User::factory()->create(['name' => '-1+1', 'admin_status' => false]);
+
+        $rows = AttendanceRecord::csvRows($user, Carbon::parse('2026-06-01'));
+
+        $this->assertCount(30, $rows);
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[1] === "\t-1+1"));
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[0] === $user->id));
+    }
+
+    /**
+     * 名前がアットマークで始まるなら、CSV の名前の先頭に数式を止める文字が付くことを確かめる。
+     * テストから名前が @SUM(1+1) の一般ユーザーと 2026-06 の日を渡して csvRows() を呼び、escapeFormula() が名前の1文字目を見てタブを付けて、30行の全部で2つ目がタブを付けた @SUM(1+1) かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_csv_rows_escape_name_starting_with_at_sign(): void
+    {
+        $user = User::factory()->create(['name' => '@SUM(1+1)', 'admin_status' => false]);
+
+        $rows = AttendanceRecord::csvRows($user, Carbon::parse('2026-06-01'));
+
+        $this->assertCount(30, $rows);
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[1] === "\t@SUM(1+1)"));
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[0] === $user->id));
+    }
+
+    /**
+     * 名前の2文字目より後に等号があるなら、CSV の名前がそのまま書かれることを確かめる。
+     * テストから名前が 山田=太郎 の一般ユーザーと 2026-06 の日を渡して csvRows() を呼び、escapeFormula() が名前の1文字目だけを見て、30行の全部で2つ目が 山田=太郎 かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_csv_rows_keep_name_with_equals_inside(): void
+    {
+        $user = User::factory()->create(['name' => '山田=太郎', 'admin_status' => false]);
+
+        $rows = AttendanceRecord::csvRows($user, Carbon::parse('2026-06-01'));
+
+        $this->assertCount(30, $rows);
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[1] === '山田=太郎'));
+        $this->assertTrue(collect($rows)->every(fn (array $row): bool => $row[0] === $user->id));
+    }
+
+    /**
      * recalculate() のテストに使う 2026-06-01 の勤怠を、渡した出勤、退勤、休憩で作る。recalculate() はまだ呼ばない。
      *
      * @param  string  $clockIn  出勤（例：09:00:00）
