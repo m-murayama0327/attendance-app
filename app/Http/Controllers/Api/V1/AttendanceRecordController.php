@@ -92,6 +92,7 @@ class AttendanceRecordController extends Controller
 
     /**
      * 勤怠の持ち主か管理者なら、勤怠を消して 204 を返す。休憩と同じ人と日付の申請も一緒に消える。
+     * 勤怠と申請のどちらかを消す途中で失敗したら、消した分を全部元に戻す。
      *
      * @param  AttendanceRecord  $attendanceRecord  URL の番号で読んだ勤怠
      * @return Response 中身のない応答（ステータスは 204）
@@ -100,7 +101,9 @@ class AttendanceRecordController extends Controller
     {
         $this->authorize('delete', $attendanceRecord);
 
-        $attendanceRecord->delete();
+        DB::transaction(function () use ($attendanceRecord): void {
+            $attendanceRecord->delete();
+        });
 
         return response()->noContent();
     }
