@@ -70,36 +70,36 @@ class AttendanceRecordSeeder extends Seeder
         // 用途の名前を足すと文字が変わり、別の数になるので、出勤の分、退勤の分、秒、休憩のずれがつられて同じ並びにならない
         $pick = fn (string $purpose, int $count): int => crc32("{$date}|{$userId}|{$purpose}") % $count;
         // 打刻ごとに秒が変わるよう、打刻の用途の名前ごとに0〜59秒を決める
-        $at = fn (string $purpose, int $hour, int $offsetMinutes): string => today()->setTime($hour, 0, $pick("{$purpose}_second", 60))->addMinutes($offsetMinutes)->format('H:i:s');
+        $makeTime = fn (string $purpose, int $hour, int $offsetMinutes): string => today()->setTime($hour, 0, $pick("{$purpose}_second", 60))->addMinutes($offsetMinutes)->format('H:i:s');
 
-        $clockIn = $at('clock_in', 8, 45 + $pick('clock_in', 16));
-        $clockOut = $at('clock_out', 18, $pick('clock_out', 16));
+        $clockIn = $makeTime('clock_in', 8, 45 + $pick('clock_in', 16));
+        $clockOut = $makeTime('clock_out', 18, $pick('clock_out', 16));
         // 昼休みに入る時刻は日によって前後するので、0〜30 から15を引いた −15〜+15分だけ、12:00 からずらす
         $breakShift = $pick('break', 31) - 15;
         // 休憩の戻りはボタンを押すまでに少し遅れるので、60分の後に0〜5分を足す。勤務が8時間を超える日は休憩を1時間以上取る決まりがあるので、早めない
-        $breaks = [['break_in' => $at('break_in', 12, $breakShift), 'break_out' => $at('break_out', 13, $breakShift + $pick('break_out', 6))]];
+        $breaks = [['break_in' => $makeTime('break_in', 12, $breakShift), 'break_out' => $makeTime('break_out', 13, $breakShift + $pick('break_out', 6))]];
 
-        $kind = crc32("{$date}|{$userId}");
+        $dayHash = crc32("{$date}|{$userId}");
 
         // 割る数が大きいほど、その種類の日は少なくなる。珍しい日の行を上に置き、2つの行に同時に当たる日が少なくなるよう、割る数はどれも素数にする
         return match (true) {
             // 休憩の打刻漏れ（休憩なし）
-            $kind % 43 === 0 => ['clock_in' => $clockIn, 'clock_out' => $clockOut, 'breaks' => []],
+            $dayHash % 43 === 0 => ['clock_in' => $clockIn, 'clock_out' => $clockOut, 'breaks' => []],
             // 退勤の打刻漏れ（退勤なし）
-            $kind % 41 === 0 => ['clock_in' => $clockIn, 'clock_out' => null, 'breaks' => $breaks],
+            $dayHash % 41 === 0 => ['clock_in' => $clockIn, 'clock_out' => null, 'breaks' => $breaks],
             // 出勤の打刻漏れ。出勤を打刻しなかった日は勤怠の行ができないので、勤怠を作らない
-            $kind % 37 === 0 => null,
+            $dayHash % 37 === 0 => null,
             // 早退（17:30〜17:45 の退勤）
-            $kind % 31 === 0 => ['clock_in' => $clockIn, 'clock_out' => $at('clock_out', 17, 45 - $pick('early_leave', 16)), 'breaks' => $breaks],
+            $dayHash % 31 === 0 => ['clock_in' => $clockIn, 'clock_out' => $makeTime('clock_out', 17, 45 - $pick('early_leave', 16)), 'breaks' => $breaks],
             // 遅刻（9:15〜9:30 の出勤）
-            $kind % 29 === 0 => ['clock_in' => $at('clock_in', 9, 15 + $pick('late', 16)), 'clock_out' => $clockOut, 'breaks' => $breaks],
+            $dayHash % 29 === 0 => ['clock_in' => $makeTime('clock_in', 9, 15 + $pick('late', 16)), 'clock_out' => $clockOut, 'breaks' => $breaks],
             // 休憩2回（30分ずつ。戻りはそれぞれ0〜3分遅れる）
-            $kind % 17 === 0 => ['clock_in' => $clockIn, 'clock_out' => $clockOut, 'breaks' => [
-                ['break_in' => $at('break_in', 12, $breakShift), 'break_out' => $at('break_out', 12, 30 + $breakShift + $pick('break_out', 4))],
-                ['break_in' => $at('second_break_in', 15, $breakShift), 'break_out' => $at('second_break_out', 15, 30 + $breakShift + $pick('second_break_out', 4))],
+            $dayHash % 17 === 0 => ['clock_in' => $clockIn, 'clock_out' => $clockOut, 'breaks' => [
+                ['break_in' => $makeTime('break_in', 12, $breakShift), 'break_out' => $makeTime('break_out', 12, 30 + $breakShift + $pick('break_out', 4))],
+                ['break_in' => $makeTime('second_break_in', 15, $breakShift), 'break_out' => $makeTime('second_break_out', 15, 30 + $breakShift + $pick('second_break_out', 4))],
             ]],
             // 長時間労働（20:15〜20:30 の退勤。勤務が10時間を超える）
-            $kind % 13 === 0 => ['clock_in' => $clockIn, 'clock_out' => $at('clock_out', 20, 15 + $pick('long_work', 16)), 'breaks' => $breaks],
+            $dayHash % 13 === 0 => ['clock_in' => $clockIn, 'clock_out' => $makeTime('clock_out', 20, 15 + $pick('long_work', 16)), 'breaks' => $breaks],
             // 通常の日
             default => ['clock_in' => $clockIn, 'clock_out' => $clockOut, 'breaks' => $breaks],
         };
