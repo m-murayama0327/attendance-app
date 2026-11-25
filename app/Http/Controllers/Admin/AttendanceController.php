@@ -202,6 +202,9 @@ class AttendanceController extends Controller
         // 今日はまだ出勤を打刻でき、今日より後の日はまだ来ていないので、昨日までの日だけを開ける
         abort_if($day === null || ! $day->isBefore(today()), 404);
 
-        return AttendanceRecord::firstOrNew(['user_id' => $user->id, 'date' => $day->toDateString()]);
+        $attendanceRecord = AttendanceRecord::firstOrNew(['user_id' => $user->id, 'date' => $day->toDateString()]);
+
+        // 読んだ人を勤怠に持たせ、後で勤怠から人を使うときにデータベースから読み直さないようにする。
+        return $attendanceRecord->setRelation('user', $user);
     }
 }

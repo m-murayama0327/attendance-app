@@ -167,9 +167,10 @@ class AttendanceController extends Controller
         $detail = $attendanceRecord->toDetailData($application === null ? $request->old() : []);
         $detail['application'] = $application;
 
+        // 勤怠の持ち主は、show() では Policy が、showDate() では findOrNewForDate() がログインしている人に限っている。そのため、勤怠から人を読み直さずにログインしている人を渡す。
         return view('user.user-detail', [
             'data' => $detail,
-            'user' => $attendanceRecord->user,
+            'user' => $request->user(),
         ]);
     }
 
