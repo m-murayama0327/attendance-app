@@ -183,13 +183,13 @@ class AttendanceRecord extends Model
 
     /**
      * 今の時刻で休憩入を打刻し、休憩の行を作る。
+     * 戻りのない休憩は休憩時間の計算に入らないので、計算した値は変わらない。そのため、計算し直さない。
      *
-     * @return void 返す値はない（休憩の行と計算した値を保存する）
+     * @return void 返す値はない（休憩の行を保存する）
      */
     public function breakIn(): void
     {
         $this->breaks()->create(['break_in' => now()->toTimeString()]);
-        $this->recalculate();
     }
 
     /**
