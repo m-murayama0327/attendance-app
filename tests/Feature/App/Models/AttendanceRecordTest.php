@@ -142,7 +142,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_recalculate_without_breaks(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', []);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:00:00', []);
 
         $attendanceRecord->recalculate();
 
@@ -160,7 +160,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_recalculate_normal_day(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
@@ -181,7 +181,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_recalculate_with_multiple_breaks(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:00:00', [
             ['break_in' => '12:00:00', 'break_out' => '13:00:00'],
             ['break_in' => '15:00:00', 'break_out' => '15:15:00'],
         ]);
@@ -201,7 +201,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_recalculate_ignores_open_break(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', null, [['break_in' => '12:00:00', 'break_out' => null]]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', null, [['break_in' => '12:00:00', 'break_out' => null]]);
 
         $attendanceRecord->recalculate();
 
@@ -218,7 +218,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_recalculate_without_clock_out(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', null, [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', null, [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
         $attendanceRecord->forceFill(['work_minutes' => 601, 'overtime_minutes' => 121, 'is_early_departure' => true, 'is_long_work' => true])->save();
 
         $attendanceRecord->recalculate();
@@ -240,7 +240,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_recalculate_truncates_clock_seconds(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:30', '18:00:10', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:30', '18:00:10', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
@@ -255,7 +255,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_recalculate_truncates_break_seconds(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [['break_in' => '12:00:40', 'break_out' => '13:00:10']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:00:00', [['break_in' => '12:00:40', 'break_out' => '13:00:10']]);
 
         $attendanceRecord->recalculate();
 
@@ -272,7 +272,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_not_late_arrival_at_nine_with_seconds(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:59', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:59', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
         $attendanceRecord->forceFill(['is_late_arrival' => true])->save();
 
         $attendanceRecord->recalculate();
@@ -288,7 +288,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_late_arrival_at_nine_one(): void
     {
-        $attendanceRecord = $this->createRecord('09:01:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:01:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
@@ -303,7 +303,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_not_early_departure_at_eighteen(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
         $attendanceRecord->forceFill(['is_early_departure' => true])->save();
 
         $attendanceRecord->recalculate();
@@ -319,7 +319,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_early_departure_before_eighteen(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '17:59:59', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '17:59:59', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
@@ -334,7 +334,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_overtime_above_eight_hours(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:01:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:01:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
@@ -351,7 +351,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_not_long_work_at_ten_hours(): void
     {
-        $attendanceRecord = $this->createRecord('08:00:00', '19:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('08:00:00', '19:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
         $attendanceRecord->forceFill(['is_long_work' => true])->save();
 
         $attendanceRecord->recalculate();
@@ -369,7 +369,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_long_work_above_ten_hours(): void
     {
-        $attendanceRecord = $this->createRecord('08:00:00', '19:01:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('08:00:00', '19:01:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
@@ -387,7 +387,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_recalculate_overwrites_old_values(): void
     {
-        $attendanceRecord = $this->createRecord('09:30:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:30:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
         $attendanceRecord->recalculate();
         $this->assertTrue($attendanceRecord->fresh()->is_late_arrival);
         $attendanceRecord->clock_in = '09:00:00';
@@ -407,7 +407,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_recalculate_reads_new_breaks(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
         $attendanceRecord->recalculate();
         AttendanceBreak::factory()->create(['attendance_record_id' => $attendanceRecord->id, 'break_in' => '15:00:00', 'break_out' => '15:15:00']);
 
@@ -426,7 +426,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_late_arrival_and_early_departure_together(): void
     {
-        $attendanceRecord = $this->createRecord('09:30:00', '17:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:30:00', '17:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
@@ -443,7 +443,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_closed_and_open_breaks_together(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', null, [
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', null, [
             ['break_in' => '12:00:00', 'break_out' => '13:00:00'],
             ['break_in' => '15:00:00', 'break_out' => null],
         ]);
@@ -1753,9 +1753,9 @@ class AttendanceRecordTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_total_time(): void
+    public function test_total_time_is_hour_and_minute_text(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
         $attendanceRecord->recalculate();
 
         $this->assertSame('08:00', $attendanceRecord->fresh()->total_time);
@@ -1767,9 +1767,9 @@ class AttendanceRecordTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_total_time_with_minutes(): void
+    public function test_total_time_keeps_minutes(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:00:00', [
             ['break_in' => '12:00:00', 'break_out' => '13:00:00'],
             ['break_in' => '15:00:00', 'break_out' => '15:15:00'],
         ]);
@@ -1784,9 +1784,9 @@ class AttendanceRecordTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_total_time_of_zero(): void
+    public function test_total_time_of_zero_is_zero_text(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '09:00:30', []);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '09:00:30', []);
         $attendanceRecord->recalculate();
 
         $this->assertSame('00:00', $attendanceRecord->fresh()->total_time);
@@ -1800,7 +1800,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_total_time_is_null_when_empty(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', null, []);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', null, []);
         $attendanceRecord->recalculate();
 
         $this->assertNull($attendanceRecord->fresh()->total_time);
@@ -1832,7 +1832,7 @@ class AttendanceRecordTest extends TestCase
      */
     public function test_total_break_time(): void
     {
-        $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord = $this->createAttendanceRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
         $attendanceRecord->recalculate();
 
         $this->assertSame('01:00', $attendanceRecord->fresh()->total_break_time);
@@ -1931,7 +1931,7 @@ class AttendanceRecordTest extends TestCase
      * @param  array<int, array{break_in: string, break_out: string|null}>  $breaks  作る休憩の行（戻りがないときは break_out を null にする）
      * @return AttendanceRecord 作った勤怠
      */
-    private function createRecord(string $clockIn, ?string $clockOut, array $breaks): AttendanceRecord
+    private function createAttendanceRecord(string $clockIn, ?string $clockOut, array $breaks): AttendanceRecord
     {
         $attendanceRecord = AttendanceRecord::factory()->create([
             'date' => '2026-06-01',

@@ -354,10 +354,10 @@ class StoreAttendanceRecordRequestTest extends TestCase
      *
      * @param  User  $user  送る人
      * @param  array<string, mixed>  $overrides  既定の値から変える項目と値
-     * @param  array<int, string>  $omitted  送らない項目
+     * @param  array<int, string>  $omittedKeys  送らない項目
      * @return TestResponse 送った後の応答
      */
-    private function postAs(User $user, array $overrides, array $omitted = []): TestResponse
+    private function postAs(User $user, array $overrides, array $omittedKeys = []): TestResponse
     {
         Sanctum::actingAs($user);
 
@@ -366,6 +366,6 @@ class StoreAttendanceRecordRequestTest extends TestCase
             'clock_in' => '09:00:00',
             'clock_out' => '18:00:00',
             'comment' => '打刻漏れのため',
-        ], $overrides), $omitted));
+        ], $overrides), $omittedKeys));
     }
 }

@@ -129,15 +129,15 @@ class AttendanceRecordSeederTest extends TestCase
         $this->seed(AttendanceRecordSeeder::class);
 
         $user1 = User::where('email', 'user1@example.com')->firstOrFail();
-        $otherRecords = fn () => AttendanceRecord::where('user_id', '!=', $user1->id);
-        $this->assertTrue($otherRecords()->where('is_late_arrival', true)->exists());
-        $this->assertTrue($otherRecords()->where('is_early_departure', true)->exists());
-        $this->assertTrue($otherRecords()->where('is_long_work', true)->exists());
-        $this->assertTrue($otherRecords()->whereNull('clock_out')->exists());
-        $this->assertTrue($otherRecords()->doesntHave('breaks')->exists());
-        $this->assertTrue($otherRecords()->has('breaks', '=', 2)->exists());
+        $queryOtherRecords = fn () => AttendanceRecord::where('user_id', '!=', $user1->id);
+        $this->assertTrue($queryOtherRecords()->where('is_late_arrival', true)->exists());
+        $this->assertTrue($queryOtherRecords()->where('is_early_departure', true)->exists());
+        $this->assertTrue($queryOtherRecords()->where('is_long_work', true)->exists());
+        $this->assertTrue($queryOtherRecords()->whereNull('clock_out')->exists());
+        $this->assertTrue($queryOtherRecords()->doesntHave('breaks')->exists());
+        $this->assertTrue($queryOtherRecords()->has('breaks', '=', 2)->exists());
         // 2026-06-01〜2026-11-19 の土日を除く日は124日なので、6人が全部の日に勤怠を持てば744行になる。
-        $this->assertLessThan(744, $otherRecords()->count());
+        $this->assertLessThan(744, $queryOtherRecords()->count());
     }
 
     /**

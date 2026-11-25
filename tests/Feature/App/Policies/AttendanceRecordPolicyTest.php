@@ -39,7 +39,7 @@ class AttendanceRecordPolicyTest extends TestCase
     {
         $admin = User::factory()->create(['admin_status' => true]);
         $user = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($user);
+        $attendanceRecord = $this->createAttendanceRecord($user);
 
         $response = $this->actingAs($admin)->post('/attendance/'.$attendanceRecord->id, self::DETAIL_VALUES);
 
@@ -66,7 +66,7 @@ class AttendanceRecordPolicyTest extends TestCase
     {
         $admin = User::factory()->create(['admin_status' => true]);
         $user = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($user);
+        $attendanceRecord = $this->createAttendanceRecord($user);
         Sanctum::actingAs($admin);
 
         $response = $this->deleteJson('/api/v1/attendance-records/'.$attendanceRecord->id);
@@ -84,7 +84,7 @@ class AttendanceRecordPolicyTest extends TestCase
     public function test_owner_can_view(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($user);
+        $attendanceRecord = $this->createAttendanceRecord($user);
 
         $response = $this->actingAs($user)->get('/attendance/'.$attendanceRecord->id);
 
@@ -102,7 +102,7 @@ class AttendanceRecordPolicyTest extends TestCase
     {
         $user = User::factory()->create(['admin_status' => false]);
         $otherUser = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($otherUser);
+        $attendanceRecord = $this->createAttendanceRecord($otherUser);
 
         $response = $this->actingAs($user)->get('/attendance/'.$attendanceRecord->id);
 
@@ -118,7 +118,7 @@ class AttendanceRecordPolicyTest extends TestCase
     public function test_owner_can_update(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($user);
+        $attendanceRecord = $this->createAttendanceRecord($user);
 
         $response = $this->actingAs($user)->post('/attendance/'.$attendanceRecord->id, self::DETAIL_VALUES);
 
@@ -141,7 +141,7 @@ class AttendanceRecordPolicyTest extends TestCase
     {
         $user = User::factory()->create(['admin_status' => false]);
         $otherUser = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($otherUser);
+        $attendanceRecord = $this->createAttendanceRecord($otherUser);
 
         $response = $this->actingAs($user)->post('/attendance/'.$attendanceRecord->id, self::DETAIL_VALUES);
 
@@ -158,7 +158,7 @@ class AttendanceRecordPolicyTest extends TestCase
     public function test_owner_can_update_via_api(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($user);
+        $attendanceRecord = $this->createAttendanceRecord($user);
         Sanctum::actingAs($user);
 
         $response = $this->putJson('/api/v1/attendance-records/'.$attendanceRecord->id, self::API_VALUES);
@@ -181,7 +181,7 @@ class AttendanceRecordPolicyTest extends TestCase
     {
         $user = User::factory()->create(['admin_status' => false]);
         $otherUser = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($otherUser);
+        $attendanceRecord = $this->createAttendanceRecord($otherUser);
         Sanctum::actingAs($user);
 
         $response = $this->putJson('/api/v1/attendance-records/'.$attendanceRecord->id, self::API_VALUES);
@@ -204,7 +204,7 @@ class AttendanceRecordPolicyTest extends TestCase
     public function test_owner_can_delete_via_api(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($user);
+        $attendanceRecord = $this->createAttendanceRecord($user);
         Sanctum::actingAs($user);
 
         $response = $this->deleteJson('/api/v1/attendance-records/'.$attendanceRecord->id);
@@ -223,7 +223,7 @@ class AttendanceRecordPolicyTest extends TestCase
     {
         $user = User::factory()->create(['admin_status' => false]);
         $otherUser = User::factory()->create(['admin_status' => false]);
-        $attendanceRecord = $this->createRecord($otherUser);
+        $attendanceRecord = $this->createAttendanceRecord($otherUser);
         Sanctum::actingAs($user);
 
         $response = $this->deleteJson('/api/v1/attendance-records/'.$attendanceRecord->id);
@@ -239,7 +239,7 @@ class AttendanceRecordPolicyTest extends TestCase
      * @param  User  $user  勤怠の持ち主の一般ユーザー
      * @return AttendanceRecord 作った勤怠
      */
-    private function createRecord(User $user): AttendanceRecord
+    private function createAttendanceRecord(User $user): AttendanceRecord
     {
         return AttendanceRecord::factory()->create([
             'user_id' => $user->id,

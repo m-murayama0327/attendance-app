@@ -172,7 +172,7 @@ class ApplicationTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_no_applications(): void
+    public function test_no_rows_are_shown_without_applications(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
 
@@ -250,7 +250,7 @@ class ApplicationTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_no_applications_for_admin(): void
+    public function test_no_rows_are_shown_without_applications_for_admin(): void
     {
         $admin = User::factory()->create(['admin_status' => true]);
 
@@ -814,7 +814,7 @@ class ApplicationTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_new_date(): void
+    public function test_new_date_is_carbon_of_date(): void
     {
         $application = Application::factory()->create(['date' => '2026-06-01']);
 
@@ -863,7 +863,7 @@ class ApplicationTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_application_date(): void
+    public function test_application_date_is_created_at(): void
     {
         $application = Application::factory()->create(['created_at' => '2026-06-02 10:00:00']);
 
