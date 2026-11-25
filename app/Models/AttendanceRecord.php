@@ -52,8 +52,8 @@ class AttendanceRecord extends Model
     ];
 
     protected $casts = [
-        'is_late' => 'boolean',
-        'is_early_leave' => 'boolean',
+        'is_late_arrival' => 'boolean',
+        'is_early_departure' => 'boolean',
         'is_long_work' => 'boolean',
     ];
 
@@ -119,12 +119,12 @@ class AttendanceRecord extends Model
 
         $clockIn = $this->toMinutes($this->clock_in);
         $this->break_minutes = $breakMinutes;
-        $this->is_late = $clockIn > $this->toMinutes(self::START_TIME);
+        $this->is_late_arrival = $clockIn > $this->toMinutes(self::START_TIME);
 
         if ($this->clock_out === null) {
             $this->work_minutes = null;
             $this->overtime_minutes = null;
-            $this->is_early_leave = false;
+            $this->is_early_departure = false;
             $this->is_long_work = false;
             $this->save();
 
@@ -136,7 +136,7 @@ class AttendanceRecord extends Model
 
         $this->work_minutes = $workMinutes;
         $this->overtime_minutes = max($workMinutes - self::REGULAR_WORK_MINUTES, 0);
-        $this->is_early_leave = $clockOut < $this->toMinutes(self::END_TIME);
+        $this->is_early_departure = $clockOut < $this->toMinutes(self::END_TIME);
         $this->is_long_work = $workMinutes > self::LONG_WORK_MINUTES;
         $this->save();
     }

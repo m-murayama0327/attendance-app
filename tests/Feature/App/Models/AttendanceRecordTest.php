@@ -20,8 +20,8 @@ class AttendanceRecordTest extends TestCase
     private const ROW_KEYS = ['date', 'full_date', 'clock_in', 'clock_out', 'total_break_time', 'total_time', 'id'];
 
     /**
-     * fill() に is_late を true、work_minutes を 999 で渡しても、2つが null のままであることを確かめる。
-     * テストから AttendanceRecord の fill() に is_late と work_minutes を渡し、$fillable が2つを受け付けず、is_late と work_minutes が null のままかを見る。
+     * fill() に is_late_arrival を true、work_minutes を 999 で渡しても、2つが null のままであることを確かめる。
+     * テストから AttendanceRecord の fill() に is_late_arrival と work_minutes を渡し、$fillable が2つを受け付けず、is_late_arrival と work_minutes が null のままかを見る。
      *
      * @return void 返す値はない
      */
@@ -29,15 +29,15 @@ class AttendanceRecordTest extends TestCase
     {
         $attendanceRecord = new AttendanceRecord;
 
-        $attendanceRecord->fill(['is_late' => true, 'work_minutes' => 999]);
+        $attendanceRecord->fill(['is_late_arrival' => true, 'work_minutes' => 999]);
 
-        $this->assertNull($attendanceRecord->is_late);
+        $this->assertNull($attendanceRecord->is_late_arrival);
         $this->assertNull($attendanceRecord->work_minutes);
     }
 
     /**
      * 3つのフラグが渡さずに作った既定の 0 なら、bool の false で読めることを確かめる。
-     * テストから勤怠を作って fresh() で読み直し、$casts が is_late、is_early_leave、is_long_work を真偽値にして、3つとも false かを見る。
+     * テストから勤怠を作って fresh() で読み直し、$casts が is_late_arrival、is_early_departure、is_long_work を真偽値にして、3つとも false かを見る。
      *
      * @return void 返す値はない
      */
@@ -45,8 +45,8 @@ class AttendanceRecordTest extends TestCase
     {
         $attendanceRecord = AttendanceRecord::factory()->create()->fresh();
 
-        $this->assertFalse($attendanceRecord->is_late);
-        $this->assertFalse($attendanceRecord->is_early_leave);
+        $this->assertFalse($attendanceRecord->is_late_arrival);
+        $this->assertFalse($attendanceRecord->is_early_departure);
         $this->assertFalse($attendanceRecord->is_long_work);
     }
 
@@ -168,8 +168,8 @@ class AttendanceRecordTest extends TestCase
         $this->assertSame(0, $attendanceRecord->overtime_minutes);
         $this->assertSame(480, $attendanceRecord->work_minutes);
         $this->assertSame(60, $attendanceRecord->break_minutes);
-        $this->assertFalse($attendanceRecord->is_late);
-        $this->assertFalse($attendanceRecord->is_early_leave);
+        $this->assertFalse($attendanceRecord->is_late_arrival);
+        $this->assertFalse($attendanceRecord->is_early_departure);
         $this->assertFalse($attendanceRecord->is_long_work);
     }
 
@@ -211,25 +211,25 @@ class AttendanceRecordTest extends TestCase
     }
 
     /**
-     * 退勤がないなら、work_minutes と overtime_minutes が空で、is_early_leave と is_long_work が false になることを確かめる。
-     * work_minutes、overtime_minutes、is_early_leave、is_long_work を 601、121、true、true にしておいた、9:00 出勤で退勤がなく、休憩 12:00〜13:00 の勤怠があるときに、テストから recalculate() を呼び、退勤のない勤怠を計算して、break_minutes が 60、is_late が false かを見る。
+     * 退勤がないなら、work_minutes と overtime_minutes が空で、is_early_departure と is_long_work が false になることを確かめる。
+     * work_minutes、overtime_minutes、is_early_departure、is_long_work を 601、121、true、true にしておいた、9:00 出勤で退勤がなく、休憩 12:00〜13:00 の勤怠があるときに、テストから recalculate() を呼び、退勤のない勤怠を計算して、break_minutes が 60、is_late_arrival が false かを見る。
      *
      * @return void 返す値はない
      */
     public function test_recalculate_without_clock_out(): void
     {
         $attendanceRecord = $this->createRecord('09:00:00', null, [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
-        $attendanceRecord->forceFill(['work_minutes' => 601, 'overtime_minutes' => 121, 'is_early_leave' => true, 'is_long_work' => true])->save();
+        $attendanceRecord->forceFill(['work_minutes' => 601, 'overtime_minutes' => 121, 'is_early_departure' => true, 'is_long_work' => true])->save();
 
         $attendanceRecord->recalculate();
 
         $attendanceRecord = $attendanceRecord->fresh();
         $this->assertNull($attendanceRecord->work_minutes);
         $this->assertNull($attendanceRecord->overtime_minutes);
-        $this->assertFalse($attendanceRecord->is_early_leave);
+        $this->assertFalse($attendanceRecord->is_early_departure);
         $this->assertFalse($attendanceRecord->is_long_work);
         $this->assertSame(60, $attendanceRecord->break_minutes);
-        $this->assertFalse($attendanceRecord->is_late);
+        $this->assertFalse($attendanceRecord->is_late_arrival);
     }
 
     /**
@@ -265,65 +265,65 @@ class AttendanceRecordTest extends TestCase
     }
 
     /**
-     * 出勤が 9:00:59 なら、is_late が false になることを確かめる。
-     * is_late を true にしておいた 9:00:59 出勤の勤怠があるときに、テストから recalculate() を呼び、出勤の時刻で遅刻を決めて、is_late が false かを見る。
+     * 出勤が 9:00:59 なら、is_late_arrival が false になることを確かめる。
+     * is_late_arrival を true にしておいた 9:00:59 出勤の勤怠があるときに、テストから recalculate() を呼び、出勤の時刻で遅刻を決めて、is_late_arrival が false かを見る。
      *
      * @return void 返す値はない
      */
-    public function test_not_late_at_nine_with_seconds(): void
+    public function test_not_late_arrival_at_nine_with_seconds(): void
     {
         $attendanceRecord = $this->createRecord('09:00:59', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
-        $attendanceRecord->forceFill(['is_late' => true])->save();
+        $attendanceRecord->forceFill(['is_late_arrival' => true])->save();
 
         $attendanceRecord->recalculate();
 
-        $this->assertFalse($attendanceRecord->fresh()->is_late);
+        $this->assertFalse($attendanceRecord->fresh()->is_late_arrival);
     }
 
     /**
-     * 出勤が 9:01:00 なら、is_late が true になることを確かめる。
-     * 9:01:00 出勤の勤怠があるときに、テストから recalculate() を呼び、出勤の時刻で遅刻を決めて、is_late が true かを見る。
+     * 出勤が 9:01:00 なら、is_late_arrival が true になることを確かめる。
+     * 9:01:00 出勤の勤怠があるときに、テストから recalculate() を呼び、出勤の時刻で遅刻を決めて、is_late_arrival が true かを見る。
      *
      * @return void 返す値はない
      */
-    public function test_late_at_nine_one(): void
+    public function test_late_arrival_at_nine_one(): void
     {
         $attendanceRecord = $this->createRecord('09:01:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
-        $this->assertTrue($attendanceRecord->fresh()->is_late);
+        $this->assertTrue($attendanceRecord->fresh()->is_late_arrival);
     }
 
     /**
-     * 退勤が 18:00:00 なら、is_early_leave が false になることを確かめる。
-     * is_early_leave を true にしておいた 18:00:00 退勤の勤怠があるときに、テストから recalculate() を呼び、退勤の時刻で早退を決めて、is_early_leave が false かを見る。
+     * 退勤が 18:00:00 なら、is_early_departure が false になることを確かめる。
+     * is_early_departure を true にしておいた 18:00:00 退勤の勤怠があるときに、テストから recalculate() を呼び、退勤の時刻で早退を決めて、is_early_departure が false かを見る。
      *
      * @return void 返す値はない
      */
-    public function test_not_early_leave_at_eighteen(): void
+    public function test_not_early_departure_at_eighteen(): void
     {
         $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
-        $attendanceRecord->forceFill(['is_early_leave' => true])->save();
+        $attendanceRecord->forceFill(['is_early_departure' => true])->save();
 
         $attendanceRecord->recalculate();
 
-        $this->assertFalse($attendanceRecord->fresh()->is_early_leave);
+        $this->assertFalse($attendanceRecord->fresh()->is_early_departure);
     }
 
     /**
-     * 退勤が 17:59:59 なら、is_early_leave が true になることを確かめる。
-     * 17:59:59 退勤の勤怠があるときに、テストから recalculate() を呼び、退勤の時刻で早退を決めて、is_early_leave が true かを見る。
+     * 退勤が 17:59:59 なら、is_early_departure が true になることを確かめる。
+     * 17:59:59 退勤の勤怠があるときに、テストから recalculate() を呼び、退勤の時刻で早退を決めて、is_early_departure が true かを見る。
      *
      * @return void 返す値はない
      */
-    public function test_early_leave_before_eighteen(): void
+    public function test_early_departure_before_eighteen(): void
     {
         $attendanceRecord = $this->createRecord('09:00:00', '17:59:59', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
-        $this->assertTrue($attendanceRecord->fresh()->is_early_leave);
+        $this->assertTrue($attendanceRecord->fresh()->is_early_departure);
     }
 
     /**
@@ -380,7 +380,7 @@ class AttendanceRecordTest extends TestCase
     }
 
     /**
-     * 9:30〜18:00 で計算して遅刻になった後に出勤を 9:00 に直すと、is_late が false になることを確かめる。
+     * 9:30〜18:00 で計算して遅刻になった後に出勤を 9:00 に直すと、is_late_arrival が false になることを確かめる。
      * 9:30 出勤の勤怠で1回計算した後に出勤を 9:00 に直したときに、テストから recalculate() をもう一度呼び、計算し直して、work_minutes が 480 かを見る。
      *
      * @return void 返す値はない
@@ -389,13 +389,13 @@ class AttendanceRecordTest extends TestCase
     {
         $attendanceRecord = $this->createRecord('09:30:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
         $attendanceRecord->recalculate();
-        $this->assertTrue($attendanceRecord->fresh()->is_late);
+        $this->assertTrue($attendanceRecord->fresh()->is_late_arrival);
         $attendanceRecord->clock_in = '09:00:00';
 
         $attendanceRecord->recalculate();
 
         $attendanceRecord = $attendanceRecord->fresh();
-        $this->assertFalse($attendanceRecord->is_late);
+        $this->assertFalse($attendanceRecord->is_late_arrival);
         $this->assertSame(480, $attendanceRecord->work_minutes);
     }
 
@@ -419,20 +419,20 @@ class AttendanceRecordTest extends TestCase
     }
 
     /**
-     * 出勤が 9:30、退勤が 17:00 なら、is_late と is_early_leave が true になることを確かめる。
-     * 9:30〜17:00 の勤怠があるときに、テストから recalculate() を呼び、出勤と退勤の時刻で遅刻と早退を決めて、is_late と is_early_leave が true かを見る。
+     * 出勤が 9:30、退勤が 17:00 なら、is_late_arrival と is_early_departure が true になることを確かめる。
+     * 9:30〜17:00 の勤怠があるときに、テストから recalculate() を呼び、出勤と退勤の時刻で遅刻と早退を決めて、is_late_arrival と is_early_departure が true かを見る。
      *
      * @return void 返す値はない
      */
-    public function test_late_and_early_leave_together(): void
+    public function test_late_arrival_and_early_departure_together(): void
     {
         $attendanceRecord = $this->createRecord('09:30:00', '17:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
 
         $attendanceRecord->recalculate();
 
         $attendanceRecord = $attendanceRecord->fresh();
-        $this->assertTrue($attendanceRecord->is_late);
-        $this->assertTrue($attendanceRecord->is_early_leave);
+        $this->assertTrue($attendanceRecord->is_late_arrival);
+        $this->assertTrue($attendanceRecord->is_early_departure);
     }
 
     /**
@@ -550,7 +550,7 @@ class AttendanceRecordTest extends TestCase
     }
 
     /**
-     * 今日の勤怠がないときに 09:30:15 に出勤を打つと、作った勤怠の is_late が true と計算されることを確かめる。
+     * 今日の勤怠がないときに 09:30:15 に出勤を打つと、作った勤怠の is_late_arrival が true と計算されることを確かめる。
      * 今日の勤怠がないときに、一般ユーザーが 2026-06-01 09:30:15 に POST /attendance に action=clock_in を送り、clockIn() が作った勤怠を計算して、/attendance に移るかを見る。
      *
      * @return void 返す値はない
@@ -562,7 +562,7 @@ class AttendanceRecordTest extends TestCase
         $response = $this->stamp($user, '2026-06-01 09:30:15', AttendanceRecord::ACTION_CLOCK_IN);
 
         $response->assertRedirect('/attendance');
-        $this->assertTrue(AttendanceRecord::sole()->is_late);
+        $this->assertTrue(AttendanceRecord::sole()->is_late_arrival);
     }
 
     /**

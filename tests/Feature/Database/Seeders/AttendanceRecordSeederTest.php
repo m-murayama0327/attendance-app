@@ -130,8 +130,8 @@ class AttendanceRecordSeederTest extends TestCase
 
         $user1 = User::where('email', 'user1@example.com')->firstOrFail();
         $otherRecords = fn () => AttendanceRecord::where('user_id', '!=', $user1->id);
-        $this->assertTrue($otherRecords()->where('is_late', true)->exists());
-        $this->assertTrue($otherRecords()->where('is_early_leave', true)->exists());
+        $this->assertTrue($otherRecords()->where('is_late_arrival', true)->exists());
+        $this->assertTrue($otherRecords()->where('is_early_departure', true)->exists());
         $this->assertTrue($otherRecords()->where('is_long_work', true)->exists());
         $this->assertTrue($otherRecords()->whereNull('clock_out')->exists());
         $this->assertTrue($otherRecords()->doesntHave('breaks')->exists());
@@ -155,8 +155,8 @@ class AttendanceRecordSeederTest extends TestCase
 
         $user1 = User::where('email', 'user1@example.com')->firstOrFail();
         $this->assertTrue(AttendanceRecord::where('user_id', '!=', $user1->id)
-            ->where('is_late', false)
-            ->where('is_early_leave', false)
+            ->where('is_late_arrival', false)
+            ->where('is_early_departure', false)
             ->where('is_long_work', false)
             ->whereNotNull('clock_out')
             ->has('breaks', '=', 1)
@@ -211,7 +211,7 @@ class AttendanceRecordSeederTest extends TestCase
 
     /**
      * user1 の勤怠の勤務時間、残業時間、当月のフラグがマイ勤怠レポートの要件の内訳どおりになることを確かめる。
-     * UserSeeder を流した後に、2026-11-20 に AttendanceRecordSeeder を流し、seedIntentionalData() が要件の内訳で渡された user1 の勤怠を作って勤務時間とフラグを計算し、user1 の勤怠の work_minutes の合計が 44640、overtime_minutes の合計が 600、2026-11 の勤怠で is_late が true の行が2行、is_early_leave が true の行が1行、is_long_work が true の行が1行で、user1 の勤怠が92行、work_minutes の合計を92で割った値の小数を切り捨てると 485（8 時間 5 分）、user1 の全部の勤怠に休憩 12:00〜13:00 が1行あるかを見る。
+     * UserSeeder を流した後に、2026-11-20 に AttendanceRecordSeeder を流し、seedIntentionalData() が要件の内訳で渡された user1 の勤怠を作って勤務時間とフラグを計算し、user1 の勤怠の work_minutes の合計が 44640、overtime_minutes の合計が 600、2026-11 の勤怠で is_late_arrival が true の行が2行、is_early_departure が true の行が1行、is_long_work が true の行が1行で、user1 の勤怠が92行、work_minutes の合計を92で割った値の小数を切り捨てると 485（8 時間 5 分）、user1 の全部の勤怠に休憩 12:00〜13:00 が1行あるかを見る。
      *
      * @return void 返す値はない
      */
@@ -228,8 +228,8 @@ class AttendanceRecordSeederTest extends TestCase
         $totalWorkMinutes = (int) $user1Records->sum('work_minutes');
         $this->assertSame(44640, $totalWorkMinutes);
         $this->assertSame(600, (int) $user1Records->sum('overtime_minutes'));
-        $this->assertSame(2, $currentMonthRecords->where('is_late', true)->count());
-        $this->assertSame(1, $currentMonthRecords->where('is_early_leave', true)->count());
+        $this->assertSame(2, $currentMonthRecords->where('is_late_arrival', true)->count());
+        $this->assertSame(1, $currentMonthRecords->where('is_early_departure', true)->count());
         $this->assertSame(1, $currentMonthRecords->where('is_long_work', true)->count());
         $this->assertCount(92, $user1Records);
         $this->assertSame(485, intdiv($totalWorkMinutes, $user1Records->count()));

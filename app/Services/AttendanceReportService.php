@@ -27,7 +27,7 @@ class AttendanceReportService
 
         $attendanceRecords = AttendanceRecord::where('user_id', $user->id)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-            ->get(['date', 'work_minutes', 'overtime_minutes', 'is_late', 'is_early_leave', 'is_long_work']);
+            ->get(['date', 'work_minutes', 'overtime_minutes', 'is_late_arrival', 'is_early_departure', 'is_long_work']);
 
         return [
             'summary' => $this->summary($attendanceRecords),
@@ -91,8 +91,8 @@ class AttendanceReportService
         $currentMonthRecords = $attendanceRecords->filter(fn (AttendanceRecord $attendanceRecord): bool => str_starts_with($attendanceRecord->date, $currentMonth));
 
         return [
-            'late_count' => $currentMonthRecords->where('is_late', true)->count(),
-            'early_leave_count' => $currentMonthRecords->where('is_early_leave', true)->count(),
+            'late_count' => $currentMonthRecords->where('is_late_arrival', true)->count(),
+            'early_leave_count' => $currentMonthRecords->where('is_early_departure', true)->count(),
             'long_work_count' => $currentMonthRecords->where('is_long_work', true)->count(),
         ];
     }
