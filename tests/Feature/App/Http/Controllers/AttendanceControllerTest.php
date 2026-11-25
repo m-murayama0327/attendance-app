@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\App\Http\Controllers;
 
+use App\Http\Controllers\AttendanceController;
 use App\Models\Application;
 use App\Models\AttendanceBreak;
 use App\Models\AttendanceRecord;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
@@ -31,6 +33,31 @@ class AttendanceControllerTest extends TestCase
         $response->assertViewIs('user.attendance-register');
         $response->assertSee('2026年6月1日(月)');
         $response->assertSee('08:05');
+    }
+
+    /**
+     * 打刻の画面を作る途中で0時を過ぎても、画面に渡す日付と時刻が同じ1つの今の日時から作られることを確かめる。
+     * テストから、最初に読む今の日時だけが 2026-11-30 23:59:59 で2回目からは 2026-12-01 00:00:00 になる時計で、一般ユーザーのリクエストを index() に渡して呼び、index() が今の日時を1回だけ取って、formattedDate が「2026年11月30日(月)」、formattedTime が「23:59」かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_date_and_time_are_taken_once(): void
+    {
+        $user = User::factory()->create(['admin_status' => false]);
+        $request = Request::create('/attendance');
+        $request->setUserResolver(fn (): User => $user);
+        $isFirstRead = true;
+        $this->travelTo(function () use (&$isFirstRead): Carbon {
+            $now = Carbon::parse($isFirstRead ? '2026-11-30 23:59:59' : '2026-12-01 00:00:00');
+            $isFirstRead = false;
+
+            return $now;
+        });
+
+        $view = app(AttendanceController::class)->index($request);
+
+        $this->assertSame('2026年11月30日(月)', $view->getData()['formattedDate']);
+        $this->assertSame('23:59', $view->getData()['formattedTime']);
     }
 
     /**

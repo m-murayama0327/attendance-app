@@ -398,6 +398,32 @@ class AttendanceReportServiceTest extends TestCase
     }
 
     /**
+     * 集計の途中で0時を過ぎて次の月になっても、範囲、月次推移の月、当月の数は集計を始めた日の月で決まることを確かめる。
+     * 勤怠の持ち主の 2026-11-30 の 09:30〜18:00 の勤怠と 2026-12-01 の 09:00〜18:00 の勤怠があるときに、テストから、最初に読む今の日時だけが 2026-11-30 23:59:59 で2回目からは 2026-12-01 00:00:00 になる時計で build() に勤怠の持ち主を渡して呼び、build() が今日の日付を1回だけ取って、summary の total_work_minutes が 450、monthlyTrend の最後の月が 2026-11 で work_minutes が 450、anomalies の late_count が 1 かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_report_keeps_month_across_midnight(): void
+    {
+        $user = User::factory()->create(['admin_status' => false]);
+        $this->createRecord($user, '2026-11-30', '09:30:00', '18:00:00');
+        $this->createRecord($user, '2026-12-01', '09:00:00', '18:00:00');
+        $isFirstRead = true;
+        $this->travelTo(function () use (&$isFirstRead): Carbon {
+            $now = Carbon::parse($isFirstRead ? '2026-11-30 23:59:59' : '2026-12-01 00:00:00');
+            $isFirstRead = false;
+
+            return $now;
+        });
+
+        $report = (new AttendanceReportService)->build($user);
+
+        $this->assertSame(450, $report['summary']['total_work_minutes']);
+        $this->assertSame(['month' => '2026-11', 'work_minutes' => 450, 'overtime_minutes' => 0], $report['monthlyTrend'][5]);
+        $this->assertSame(1, $report['anomalies']['late_count']);
+    }
+
+    /**
      * 渡したユーザーと日付の勤怠を渡した出勤と退勤で作り、休憩 12:00〜13:00 を1行付けて recalculate() で計算する。
      *
      * @param  User  $user  勤怠の持ち主の一般ユーザー

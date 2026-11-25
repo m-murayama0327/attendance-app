@@ -507,6 +507,28 @@ class AttendanceRecordTest extends TestCase
     }
 
     /**
+     * 出勤の打刻の途中で0時を過ぎても、date と clock_in が同じ1つの今の日時から作られることを確かめる。
+     * テストから、最初に読む今の日時だけが 2026-11-30 23:59:59 で2回目からは 2026-12-01 00:00:00 になる時計で clockIn() を呼び、clockIn() が今の日時を1回だけ取って、date が 2026-11-30、clock_in が 23:59:59 の勤怠ができるかを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_clock_in_keeps_date_across_midnight(): void
+    {
+        $user = User::factory()->create(['admin_status' => false]);
+        $isFirstRead = true;
+        $this->travelTo(function () use (&$isFirstRead): Carbon {
+            $now = Carbon::parse($isFirstRead ? '2026-11-30 23:59:59' : '2026-12-01 00:00:00');
+            $isFirstRead = false;
+
+            return $now;
+        });
+
+        AttendanceRecord::clockIn($user);
+
+        $this->assertDatabaseHas('attendance_records', ['user_id' => $user->id, 'date' => '2026-11-30', 'clock_in' => '23:59:59']);
+    }
+
+    /**
      * 打刻する日時が 2026-06-01 09:30:15 なら、date が 2026-06-01、clock_in が 09:30:15 の勤怠ができることを確かめる。
      * 今日の勤怠がないときに、一般ユーザーが POST /attendance に action=clock_in を送り、clockIn() が今の日時で勤怠を作って、/attendance に移り、「出勤中」が出るかを見る。
      *
