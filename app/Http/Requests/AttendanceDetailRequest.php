@@ -94,6 +94,7 @@ class AttendanceDetailRequest extends FormRequest
             'new_break_out.*.after' => '休憩時間が不適切な値です',
             'new_break_out.*.before_or_equal' => '休憩時間もしくは退勤時間が不適切な値です',
             'comment.required' => '備考を記入してください',
+            'comment.string' => '備考が不適切な値です',
             'comment.max' => '備考は255文字以内で入力してください',
         ];
     }
