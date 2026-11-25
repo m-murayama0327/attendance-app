@@ -103,4 +103,38 @@ class UserDetailTest extends TestCase
         $response->assertOk();
         $this->assertSame(2, substr_count($response->getContent(), '〜'));
     }
+
+    /**
+     * 保存した備考は、直せる備考の欄の中身に出ることを確かめる。
+     * 自分の 2026-06-01 の勤怠の備考が「在宅勤務のため」のときに、一般ユーザーが GET /attendance/{id} を送り、user-detail.blade.php が備考を textarea の中身に置いて、200 で直せる備考の欄の中身が「在宅勤務のため」かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_saved_comment_is_shown_in_textarea(): void
+    {
+        $user = User::factory()->create(['admin_status' => false]);
+        $attendanceRecord = AttendanceRecord::factory()->create(['user_id' => $user->id, 'date' => '2026-06-01', 'comment' => '在宅勤務のため']);
+
+        $response = $this->actingAs($user)->get('/attendance/'.$attendanceRecord->id);
+
+        $response->assertOk();
+        $response->assertSee('<textarea class="form__textarea" id="comment" name="comment">在宅勤務のため</textarea>', false);
+    }
+
+    /**
+     * 申請の備考は、読み取りの備考の欄の中身に出ることを確かめる。
+     * 自分の 2026-06-01 の承認待ちの申請の備考が「打刻の時刻を誤ったため」のときに、一般ユーザーが GET /application/{id} を送り、user-detail.blade.php が申請の備考を読み取りの textarea の中身に置いて、200 で読み取りの備考の欄の中身が「打刻の時刻を誤ったため」かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_application_comment_is_shown_in_readonly_textarea(): void
+    {
+        $user = User::factory()->create(['admin_status' => false]);
+        $application = Application::factory()->create(['user_id' => $user->id, 'date' => '2026-06-01', 'comment' => '打刻の時刻を誤ったため']);
+
+        $response = $this->actingAs($user)->get('/application/'.$application->id);
+
+        $response->assertOk();
+        $response->assertSee('<textarea class="form__textarea readonly" readonly>打刻の時刻を誤ったため</textarea>', false);
+    }
 }
