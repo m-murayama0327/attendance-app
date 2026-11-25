@@ -1938,7 +1938,7 @@ class AttendanceRecordTest extends TestCase
             'clock_in' => $clockIn,
             'clock_out' => $clockOut,
         ]);
-        $attendanceRecord->breaks()->createMany($breaks);
+        AttendanceBreak::factory()->forEachSequence(...$breaks)->create(['attendance_record_id' => $attendanceRecord->id]);
 
         return $attendanceRecord;
     }
@@ -1960,7 +1960,7 @@ class AttendanceRecordTest extends TestCase
             'clock_in' => $clockIn,
             'clock_out' => $clockOut,
         ]);
-        $attendanceRecord->breaks()->createMany($breaks);
+        AttendanceBreak::factory()->forEachSequence(...$breaks)->create(['attendance_record_id' => $attendanceRecord->id]);
         $attendanceRecord->recalculate();
     }
 
