@@ -37,16 +37,16 @@ class Handler extends ExceptionHandler
         });
 
         // Laravel は ModelNotFoundException と AuthorizationException をここに渡す前に HTTP の例外に包むため、包んだ後の型で受けて元の型を getPrevious() で確かめる
-        $this->renderable(function (NotFoundHttpException $e, Request $request): ?JsonResponse {
-            if (! $request->is('api/*') || ! $e->getPrevious() instanceof ModelNotFoundException) {
+        $this->renderable(function (NotFoundHttpException $exception, Request $request): ?JsonResponse {
+            if (! $request->is('api/*') || ! $exception->getPrevious() instanceof ModelNotFoundException) {
                 return null;
             }
 
             return response()->json(['error' => '勤怠情報が見つかりませんでした。'], 404);
         });
 
-        $this->renderable(function (AccessDeniedHttpException $e, Request $request): ?JsonResponse {
-            if (! $request->is('api/*') || ! $e->getPrevious() instanceof AuthorizationException) {
+        $this->renderable(function (AccessDeniedHttpException $exception, Request $request): ?JsonResponse {
+            if (! $request->is('api/*') || ! $exception->getPrevious() instanceof AuthorizationException) {
                 return null;
             }
 
@@ -58,11 +58,11 @@ class Handler extends ExceptionHandler
      * 公開API（api/*）のパスなら、Accept のヘッダーによらずエラーを JSON で返す。他のパスは Laravel の判定に任せる。
      *
      * @param  Request  $request  届いたリクエスト
-     * @param  Throwable  $e  起きた例外
+     * @param  Throwable  $exception  起きた例外
      * @return bool JSON で返すなら true
      */
-    protected function shouldReturnJson($request, Throwable $e): bool
+    protected function shouldReturnJson($request, Throwable $exception): bool
     {
-        return $request->is('api/*') || parent::shouldReturnJson($request, $e);
+        return $request->is('api/*') || parent::shouldReturnJson($request, $exception);
     }
 }
