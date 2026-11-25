@@ -23,8 +23,8 @@ return new class extends Migration
             $table->unsignedSmallInteger('work_minutes')->nullable();
             $table->unsignedSmallInteger('break_minutes')->nullable();
             $table->unsignedSmallInteger('overtime_minutes')->nullable();
-            $table->boolean('is_late')->default(false);
-            $table->boolean('is_early_leave')->default(false);
+            $table->boolean('is_late_arrival')->default(false);
+            $table->boolean('is_early_departure')->default(false);
             $table->boolean('is_long_work')->default(false);
             $table->timestamps();
 

@@ -13,7 +13,7 @@ class CreateAttendanceRecordsTableTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * is_late、is_early_leave、is_long_work を渡さずに勤怠を作ると、3つとも false になることを確かめる。
+     * is_late_arrival、is_early_departure、is_long_work を渡さずに勤怠を作ると、3つとも false になることを確かめる。
      * テストから AttendanceRecordFactory で3つのフラグを渡さずに 2026-06-01 の勤怠を作って fresh() で読み直し、up() が既定の値の false を書いて、3つのフラグが false かを見る。
      *
      * @return void 返す値はない
@@ -25,8 +25,8 @@ class CreateAttendanceRecordsTableTest extends TestCase
 
         $attendanceRecord = $attendanceRecord->fresh();
 
-        $this->assertFalse($attendanceRecord->is_late);
-        $this->assertFalse($attendanceRecord->is_early_leave);
+        $this->assertFalse($attendanceRecord->is_late_arrival);
+        $this->assertFalse($attendanceRecord->is_early_departure);
         $this->assertFalse($attendanceRecord->is_long_work);
     }
 

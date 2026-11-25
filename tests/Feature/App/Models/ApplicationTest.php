@@ -7,8 +7,8 @@ use App\Models\AttendanceBreak;
 use App\Models\AttendanceRecord;
 use App\Models\ProposalBreak;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -172,7 +172,7 @@ class ApplicationTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_no_applications(): void
+    public function test_no_rows_are_shown_without_applications(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
 
@@ -250,7 +250,7 @@ class ApplicationTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_no_applications_for_admin(): void
+    public function test_no_rows_are_shown_without_applications_for_admin(): void
     {
         $admin = User::factory()->create(['admin_status' => true]);
 
@@ -350,13 +350,15 @@ class ApplicationTest extends TestCase
 
     /**
      * 同じ人と日付の勤怠があるなら、id がその勤怠の id になることを確かめる。
-     * 同じ人の 2026-06-01 の勤怠と、入りの遅い順に作った申請の休憩2行があるときに、テストから toDetailData() を呼び、year が「2026年」、date が「6月1日」、breaks が break_in の昇順かを見る。
+     * 同じ人の 2026-05-31 と 2026-06-01 の勤怠と、入りの遅い順に作った申請の休憩2行があるときに、テストから toDetailData() を呼び、id が 2026-06-01 の勤怠の id、year が「2026年」、date が「6月1日」、breaks が break_in の昇順かを見る。
      *
      * @return void 返す値はない
      */
     public function test_detail_data_breaks(): void
     {
         $user = User::factory()->create();
+        // 勤怠と申請の id が同じ値だと、申請の id を返す誤りでもテストが通る。そのため、先に別の日の勤怠を作って id をずらす。
+        AttendanceRecord::factory()->create(['user_id' => $user->id, 'date' => '2026-05-31']);
         $attendanceRecord = AttendanceRecord::factory()->create(['user_id' => $user->id, 'date' => '2026-06-01']);
         $application = Application::factory()->create(['user_id' => $user->id, 'date' => '2026-06-01']);
         ProposalBreak::factory()->create(['application_id' => $application->id, 'break_in' => '15:00:00', 'break_out' => '15:15:00']);
@@ -812,7 +814,7 @@ class ApplicationTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_new_date(): void
+    public function test_new_date_is_carbon_of_date(): void
     {
         $application = Application::factory()->create(['date' => '2026-06-01']);
 
@@ -861,7 +863,7 @@ class ApplicationTest extends TestCase
      *
      * @return void 返す値はない
      */
-    public function test_application_date(): void
+    public function test_application_date_is_created_at(): void
     {
         $application = Application::factory()->create(['created_at' => '2026-06-02 10:00:00']);
 

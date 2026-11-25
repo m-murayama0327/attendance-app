@@ -13,8 +13,8 @@ class StampRequestTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * action が空なら、action にエラーがあり、勤怠ができないことを確かめる。
-     * 今日の勤怠がないときに、一般ユーザーが POST /attendance で action を空にして送り、rules() が action の required で止めて、勤怠ができず、/attendance へ戻るかを見る。
+     * action が空なら、action に required の文言のエラーがあり、勤怠ができないことを確かめる。
+     * 今日の勤怠がないときに、一般ユーザーが POST /attendance で action を空にして送り、rules() が action の required で止めて、required の文言が出て、勤怠ができず、/attendance へ戻るかを見る。
      *
      * @return void 返す値はない
      */
@@ -23,7 +23,7 @@ class StampRequestTest extends TestCase
         $response = $this->postStamp('');
 
         $response->assertRedirect('/attendance');
-        $response->assertSessionHasErrors('action');
+        $response->assertSessionHasErrors(['action' => __('validation.required', ['attribute' => 'action'])]);
         $this->assertDatabaseCount('attendance_records', 0);
     }
 

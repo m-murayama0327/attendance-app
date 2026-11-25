@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Models\AttendanceBreak;
+use App\Models\AttendanceRecord;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -39,7 +40,7 @@ class UpdateAttendanceRecordRequest extends FormRequest
             ],
             'clock_in' => ['sometimes', 'required', 'date_format:H:i:s'],
             'clock_out' => ['nullable', 'date_format:H:i:s'],
-            'comment' => ['nullable', 'string', 'max:255'],
+            'comment' => ['nullable', 'string', 'max:'.AttendanceRecord::COMMENT_MAX_LENGTH],
         ];
     }
 
@@ -102,7 +103,7 @@ class UpdateAttendanceRecordRequest extends FormRequest
             'clock_out.after' => '退勤時刻は出勤時刻より後の時刻を指定してください。',
             'breaks.outside_work' => '休憩時間が出勤時刻と退勤時刻の間に収まっていません。',
             'comment.string' => '備考は文字で指定してください。',
-            'comment.max' => '備考は 255 文字以内で入力してください。',
+            'comment.max' => '備考は '.AttendanceRecord::COMMENT_MAX_LENGTH.' 文字以内で入力してください。',
         ];
     }
 }

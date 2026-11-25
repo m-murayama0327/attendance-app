@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\App\Support;
 
+use App\Models\AttendanceBreak;
 use App\Models\AttendanceRecord;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -51,7 +52,7 @@ class TimeFormatTest extends TestCase
             'clock_in' => '09:00:23',
             'clock_out' => null,
         ]);
-        $attendanceRecord->breaks()->create(['break_in' => '12:00:10']);
+        AttendanceBreak::factory()->create(['attendance_record_id' => $attendanceRecord->id, 'break_in' => '12:00:10', 'break_out' => null]);
 
         $response = $this->actingAs($user)->get('/attendance/'.$attendanceRecord->id);
 

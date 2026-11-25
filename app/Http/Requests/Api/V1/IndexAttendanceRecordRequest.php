@@ -6,6 +6,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class IndexAttendanceRecordRequest extends FormRequest
 {
+    // 要件で決まった1ページあたりの件数で、送られないときはこの件数で返す。
+    public const DEFAULT_PER_PAGE = 20;
+
+    // 要件で決まった1ページあたりの件数の上限で、これより多い件数は受けない。
+    public const MAX_PER_PAGE = 100;
+
     /**
      * 勤怠一覧は認証も認可も要らないので、だれにでも true を返す。
      *
@@ -28,7 +34,7 @@ class IndexAttendanceRecordRequest extends FormRequest
             'date' => ['nullable', 'date_format:Y-m-d'],
             'month' => ['nullable', 'date_format:Y-m'],
             'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
         ];
     }
 
@@ -45,9 +51,9 @@ class IndexAttendanceRecordRequest extends FormRequest
             'month.date_format' => '年月は YYYY-MM 形式で指定してください。',
             'page.integer' => 'ページ番号は1以上の整数で指定してください。',
             'page.min' => 'ページ番号は1以上の整数で指定してください。',
-            'per_page.integer' => '1ページあたりの件数は1以上100以下の整数で指定してください。',
-            'per_page.min' => '1ページあたりの件数は1以上100以下の整数で指定してください。',
-            'per_page.max' => '1ページあたりの件数は1以上100以下の整数で指定してください。',
+            'per_page.integer' => '1ページあたりの件数は1以上'.self::MAX_PER_PAGE.'以下の整数で指定してください。',
+            'per_page.min' => '1ページあたりの件数は1以上'.self::MAX_PER_PAGE.'以下の整数で指定してください。',
+            'per_page.max' => '1ページあたりの件数は1以上'.self::MAX_PER_PAGE.'以下の整数で指定してください。',
         ];
     }
 }

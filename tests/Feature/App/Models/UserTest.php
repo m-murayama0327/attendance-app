@@ -228,7 +228,7 @@ class UserTest extends TestCase
 
     /**
      * 前の日の退勤なしの勤怠だけがあるなら、翌日に退勤を打っても、前の日の clock_out が空のままであることを確かめる。
-     * 2026-05-31 の退勤なしの勤怠だけがあるときに、一般ユーザーが 2026-06-01 に POST /attendance に action=clock_out を送り、findTodayAttendanceRecord() が今日の勤怠を探して、/attendance に移り、勤怠が1行のままかを見る。
+     * 2026-05-31 の 09:00:00 出勤で退勤なしの勤怠だけがあるときに、一般ユーザーが 2026-06-01 10:00:00 に POST /attendance に action=clock_out を送り、findTodayAttendanceRecord() が今日の勤怠を探して、/attendance に移り、勤怠が1行のままかを見る。
      *
      * @return void 返す値はない
      */
@@ -236,7 +236,8 @@ class UserTest extends TestCase
     {
         $user = User::factory()->create(['admin_status' => false]);
         AttendanceRecord::factory()->create(['user_id' => $user->id, 'date' => '2026-05-31', 'clock_in' => '09:00:00', 'clock_out' => null]);
-        $this->travelTo(Carbon::parse('2026-06-01 09:00:00'));
+        // 出勤と同じ秒の退勤は書かれない。そのため、前の日の勤怠を見つけてしまったときに退勤が書かれてテストが落ちるように、出勤と違う時刻にする。
+        $this->travelTo(Carbon::parse('2026-06-01 10:00:00'));
 
         $response = $this->actingAs($user)->post('/attendance', ['action' => AttendanceRecord::ACTION_CLOCK_OUT]);
 

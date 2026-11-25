@@ -29,6 +29,9 @@ class AttendanceRecord extends Model
 
     public const ACTIONS = [self::ACTION_CLOCK_IN, self::ACTION_CLOCK_OUT, self::ACTION_BREAK_IN, self::ACTION_BREAK_OUT];
 
+    // 勤怠と申請の備考のカラムに入る文字数の上限で、これより長い備考は受けない。
+    public const COMMENT_MAX_LENGTH = 255;
+
     // 要件で決まった始業と終業の時刻で、出勤がこれより後なら遅刻、退勤がこれより前なら早退にする
     private const START_TIME = '09:00';
 
@@ -49,8 +52,8 @@ class AttendanceRecord extends Model
     ];
 
     protected $casts = [
-        'is_late' => 'boolean',
-        'is_early_leave' => 'boolean',
+        'is_late_arrival' => 'boolean',
+        'is_early_departure' => 'boolean',
         'is_long_work' => 'boolean',
     ];
 
@@ -101,6 +104,19 @@ class AttendanceRecord extends Model
     }
 
     /**
+     * 日付が渡された初めの日から終わりの日まで（両端の日を含む）の勤怠に絞る。
+     *
+     * @param  Builder<AttendanceRecord>  $query  絞る前の勤怠のクエリ
+     * @param  Carbon  $start  範囲の初めの日
+     * @param  Carbon  $end  範囲の終わりの日
+     * @return void 返す値はない
+     */
+    public function scopeBetweenDates(Builder $query, Carbon $start, Carbon $end): void
+    {
+        $query->whereBetween('date', [$start->toDateString(), $end->toDateString()]);
+    }
+
+    /**
      * 休憩時間、勤務時間、残業時間と、遅刻、早退、長時間労働のフラグを計算して保存する。
      * 時刻を書いた後に呼ぶ。退勤がないときは、勤務時間と残業時間を空にする。
      *
@@ -116,12 +132,12 @@ class AttendanceRecord extends Model
 
         $clockIn = $this->toMinutes($this->clock_in);
         $this->break_minutes = $breakMinutes;
-        $this->is_late = $clockIn > $this->toMinutes(self::START_TIME);
+        $this->is_late_arrival = $clockIn > $this->toMinutes(self::START_TIME);
 
         if ($this->clock_out === null) {
             $this->work_minutes = null;
             $this->overtime_minutes = null;
-            $this->is_early_leave = false;
+            $this->is_early_departure = false;
             $this->is_long_work = false;
             $this->save();
 
@@ -129,26 +145,28 @@ class AttendanceRecord extends Model
         }
 
         $clockOut = $this->toMinutes($this->clock_out);
-        $workMinutes = max($clockOut - $clockIn - $breakMinutes, 0);
+        $workMinutes = $clockOut - $clockIn - $breakMinutes;
 
         $this->work_minutes = $workMinutes;
         $this->overtime_minutes = max($workMinutes - self::REGULAR_WORK_MINUTES, 0);
-        $this->is_early_leave = $clockOut < $this->toMinutes(self::END_TIME);
+        $this->is_early_departure = $clockOut < $this->toMinutes(self::END_TIME);
         $this->is_long_work = $workMinutes > self::LONG_WORK_MINUTES;
         $this->save();
     }
 
     /**
      * 今の時刻で出勤を打刻し、今日の勤怠を返す。同じ日の勤怠がもうあれば、その行を返して書き換えない。
+     * 日付と時刻は、1回だけ取った今の日時から作る。こうすると、0時をまたいでも、日付と時刻が食い違わない。
      *
      * @param  User  $user  出勤するユーザー
      * @return self 今日の勤怠
      */
     public static function clockIn(User $user): self
     {
+        $now = now();
         $attendanceRecord = self::createOrFirst(
-            ['user_id' => $user->id, 'date' => today()->toDateString()],
-            ['clock_in' => now()->toTimeString()],
+            ['user_id' => $user->id, 'date' => $now->toDateString()],
+            ['clock_in' => $now->toTimeString()],
         );
 
         if ($attendanceRecord->wasRecentlyCreated) {
@@ -178,13 +196,13 @@ class AttendanceRecord extends Model
 
     /**
      * 今の時刻で休憩入を打刻し、休憩の行を作る。
+     * 戻りのない休憩は休憩時間の計算に入らないので、計算した値は変わらない。そのため、計算し直さない。
      *
-     * @return void 返す値はない（休憩の行と計算した値を保存する）
+     * @return void 返す値はない（休憩の行を保存する）
      */
     public function breakIn(): void
     {
         $this->breaks()->create(['break_in' => now()->toTimeString()]);
-        $this->recalculate();
     }
 
     /**
@@ -319,8 +337,8 @@ class AttendanceRecord extends Model
         $start = $month->copy()->startOfMonth();
         $end = $month->copy()->endOfMonth();
 
-        $attendanceRecords = self::where('user_id', $user->id)
-            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+        $attendanceRecords = $user->attendanceRecords()
+            ->betweenDates($start, $end)
             ->get()
             ->keyBy('date');
 
@@ -345,6 +363,7 @@ class AttendanceRecord extends Model
      * 渡されたユーザーと月について、CSV に書く日ごとの行を返す。行の値は、ID、名前、日付、出勤、退勤、休憩、合計の順にする。
      * 給与計算など他のシステムとつなぐときに人を見分けられるように、全部の行の先頭にユーザーの ID と名前を入れる。
      * 休憩と合計は、画面と同じく `8:00` の形にする。勤怠のない日は、ID と名前と日付のほかを null のまま返す。
+     * 名前が `=`、`+`、`-`、`@` で始まるときは、表計算ソフトが数式として動かさないように、先頭にタブを付ける。
      *
      * @param  User  $user  勤怠を書き出すユーザー
      * @param  Carbon  $month  書き出す月の中の日
@@ -355,7 +374,7 @@ class AttendanceRecord extends Model
         return collect(self::monthlyRows($user, $month))
             ->map(fn (array $row): array => [
                 $user->id,
-                $user->name,
+                self::escapeFormula($user->name),
                 $row['date'],
                 $row['clock_in'],
                 $row['clock_out'],
@@ -563,5 +582,22 @@ class AttendanceRecord extends Model
         [$hours, $minutes] = explode(':', $time);
 
         return (int) $hours * 60 + (int) $minutes;
+    }
+
+    /**
+     * 渡された文字が `=`、`+`、`-`、`@` で始まるときは、先頭にタブを付けて返す。それ以外は、そのまま返す。
+     * 先頭にタブがあると、表計算ソフトは値を数式ではなく文字として扱う。
+     * タブと改行で始まる値は数えない。名前の前後の空白（タブと改行も入る）は、Laravel の初期のミドルウェアの `TrimStrings` が消すので、タブと改行で始まる名前は入らない。
+     *
+     * @param  string  $value  CSV に書く文字
+     * @return string 数式にならないようにした文字
+     */
+    private static function escapeFormula(string $value): string
+    {
+        if (in_array(substr($value, 0, 1), ['=', '+', '-', '@'], true)) {
+            return "\t".$value;
+        }
+
+        return $value;
     }
 }

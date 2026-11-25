@@ -23,7 +23,7 @@ class ApplicationFactory extends Factory
             'date' => today()->subDays(fake()->numberBetween(1, 30))->toDateString(),
             'new_clock_in' => '08:30:00',
             'new_clock_out' => '18:30:00',
-            'comment' => '電車遅延のため',
+            'comment' => '打刻の時刻を誤ったため',
         ];
     }
 }

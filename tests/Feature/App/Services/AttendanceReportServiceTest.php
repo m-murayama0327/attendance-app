@@ -24,8 +24,8 @@ class AttendanceReportServiceTest extends TestCase
     {
         $user = User::factory()->create(['admin_status' => false]);
         $otherUser = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-11-02', '09:00:00', '18:00:00');
-        $this->createRecord($otherUser, '2026-11-02', '09:00:00', '20:00:00');
+        $this->createAttendanceRecord($user, '2026-11-02', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($otherUser, '2026-11-02', '09:00:00', '20:00:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -43,7 +43,7 @@ class AttendanceReportServiceTest extends TestCase
     public function test_range_does_not_overflow_on_month_end(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-02-01', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-02-01', '09:00:00', '18:00:00');
         $this->travelTo(Carbon::parse('2026-07-31 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -61,7 +61,7 @@ class AttendanceReportServiceTest extends TestCase
     public function test_day_before_range_is_excluded(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-05-31', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-05-31', '09:00:00', '18:00:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -78,7 +78,7 @@ class AttendanceReportServiceTest extends TestCase
     public function test_first_day_of_range_is_included(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-06-01', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-06-01', '09:00:00', '18:00:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -95,7 +95,7 @@ class AttendanceReportServiceTest extends TestCase
     public function test_last_day_of_month_is_included(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-11-30', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-11-30', '09:00:00', '18:00:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -112,7 +112,7 @@ class AttendanceReportServiceTest extends TestCase
     public function test_next_month_is_excluded(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-12-01', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-12-01', '09:00:00', '18:00:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -129,7 +129,7 @@ class AttendanceReportServiceTest extends TestCase
     public function test_range_crosses_year(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-08-01', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-08-01', '09:00:00', '18:00:00');
         $this->travelTo(Carbon::parse('2027-01-15 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -147,16 +147,16 @@ class AttendanceReportServiceTest extends TestCase
     public function test_report_values_match_requirements(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-04-01', '09:00:00', '18:00:00');
-        $this->createRecord($user, '2026-05-01', '09:00:00', '18:00:00');
-        $this->createRecord($user, '2026-06-01', '09:00:00', '20:00:00');
-        $this->createRecord($user, '2026-08-03', '09:00:00', '18:00:00');
-        $this->createRecord($user, '2026-08-04', '09:00:00', '18:00:00');
-        $this->createRecord($user, '2026-09-01', '09:30:00', '18:00:00');
-        $this->createRecord($user, '2026-10-01', '09:00:00', '18:00:00');
-        $this->createRecord($user, '2026-11-02', '09:30:00', '18:00:00');
-        $this->createRecord($user, '2026-11-03', '09:00:00', '17:00:00');
-        $this->createRecord($user, '2026-11-04', '08:00:00', '21:00:00');
+        $this->createAttendanceRecord($user, '2026-04-01', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-05-01', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-06-01', '09:00:00', '20:00:00');
+        $this->createAttendanceRecord($user, '2026-08-03', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-08-04', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-09-01', '09:30:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-10-01', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-11-02', '09:30:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-11-03', '09:00:00', '17:00:00');
+        $this->createAttendanceRecord($user, '2026-11-04', '08:00:00', '21:00:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $response = $this->actingAs($user)->get('/attendance/report');
@@ -227,9 +227,9 @@ class AttendanceReportServiceTest extends TestCase
     public function test_average_ignores_day_without_clock_out(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-11-02', '09:00:00', '18:00:00');
-        $this->createRecord($user, '2026-11-03', '09:00:00', '19:00:00');
-        $this->createRecord($user, '2026-11-04', '09:00:00', null, false);
+        $this->createAttendanceRecord($user, '2026-11-02', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-11-03', '09:00:00', '19:00:00');
+        $this->createAttendanceRecord($user, '2026-11-04', '09:00:00', null, false);
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -248,8 +248,8 @@ class AttendanceReportServiceTest extends TestCase
     public function test_average_is_truncated(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-11-02', '09:00:00', '18:00:00');
-        $this->createRecord($user, '2026-11-03', '09:00:00', '18:01:00');
+        $this->createAttendanceRecord($user, '2026-11-02', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-11-03', '09:00:00', '18:01:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -268,7 +268,7 @@ class AttendanceReportServiceTest extends TestCase
     public function test_monthly_trend_fills_empty_months(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-08-03', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-08-03', '09:00:00', '18:00:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -292,8 +292,8 @@ class AttendanceReportServiceTest extends TestCase
     public function test_monthly_trend_sums_same_month(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-08-03', '09:00:00', '18:00:00');
-        $this->createRecord($user, '2026-08-04', '09:00:00', '20:00:00');
+        $this->createAttendanceRecord($user, '2026-08-03', '09:00:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-08-04', '09:00:00', '20:00:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -350,10 +350,10 @@ class AttendanceReportServiceTest extends TestCase
     public function test_anomalies_count_each_flag(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-11-02', '09:30:00', '18:00:00');
-        $this->createRecord($user, '2026-11-03', '09:30:00', '18:00:00');
-        $this->createRecord($user, '2026-11-04', '09:00:00', '17:00:00');
-        $this->createRecord($user, '2026-11-05', '08:00:00', '21:00:00');
+        $this->createAttendanceRecord($user, '2026-11-02', '09:30:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-11-03', '09:30:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-11-04', '09:00:00', '17:00:00');
+        $this->createAttendanceRecord($user, '2026-11-05', '08:00:00', '21:00:00');
         $this->travelTo(Carbon::parse('2026-11-16 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -372,7 +372,7 @@ class AttendanceReportServiceTest extends TestCase
     public function test_previous_month_anomaly_is_excluded(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-10-31', '09:30:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-10-31', '09:30:00', '18:00:00');
         $this->travelTo(Carbon::parse('2026-11-01 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
@@ -389,11 +389,37 @@ class AttendanceReportServiceTest extends TestCase
     public function test_first_day_anomaly_is_counted(): void
     {
         $user = User::factory()->create(['admin_status' => false]);
-        $this->createRecord($user, '2026-11-01', '09:30:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-11-01', '09:30:00', '18:00:00');
         $this->travelTo(Carbon::parse('2026-11-01 10:00:00'));
 
         $report = (new AttendanceReportService)->build($user);
 
+        $this->assertSame(1, $report['anomalies']['late_count']);
+    }
+
+    /**
+     * 集計の途中で0時を過ぎて次の月になっても、範囲、月次推移の月、当月の数は集計を始めた日の月で決まることを確かめる。
+     * 勤怠の持ち主の 2026-11-30 の 09:30〜18:00 の勤怠と 2026-12-01 の 09:00〜18:00 の勤怠があるときに、テストから、最初に読む今の日時だけが 2026-11-30 23:59:59 で2回目からは 2026-12-01 00:00:00 になる時計で build() に勤怠の持ち主を渡して呼び、build() が今日の日付を1回だけ取って、summary の total_work_minutes が 450、monthlyTrend の最後の月が 2026-11 で work_minutes が 450、anomalies の late_count が 1 かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_report_keeps_month_across_midnight(): void
+    {
+        $user = User::factory()->create(['admin_status' => false]);
+        $this->createAttendanceRecord($user, '2026-11-30', '09:30:00', '18:00:00');
+        $this->createAttendanceRecord($user, '2026-12-01', '09:00:00', '18:00:00');
+        $isFirstRead = true;
+        $this->travelTo(function () use (&$isFirstRead): Carbon {
+            $now = Carbon::parse($isFirstRead ? '2026-11-30 23:59:59' : '2026-12-01 00:00:00');
+            $isFirstRead = false;
+
+            return $now;
+        });
+
+        $report = (new AttendanceReportService)->build($user);
+
+        $this->assertSame(450, $report['summary']['total_work_minutes']);
+        $this->assertSame(['month' => '2026-11', 'work_minutes' => 450, 'overtime_minutes' => 0], $report['monthlyTrend'][5]);
         $this->assertSame(1, $report['anomalies']['late_count']);
     }
 
@@ -407,7 +433,7 @@ class AttendanceReportServiceTest extends TestCase
      * @param  bool  $hasBreak  休憩 12:00〜13:00 を付けるなら true
      * @return void 返す値はない
      */
-    private function createRecord(User $user, string $date, string $clockIn, ?string $clockOut, bool $hasBreak = true): void
+    private function createAttendanceRecord(User $user, string $date, string $clockIn, ?string $clockOut, bool $hasBreak = true): void
     {
         $attendanceRecord = AttendanceRecord::factory()->create([
             'user_id' => $user->id,

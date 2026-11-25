@@ -375,8 +375,8 @@ class AttendanceDetailRequestTest extends TestCase
     }
 
     /**
-     * comment が配列 ['a'] なら、/attendance/{id} へ戻り、comment にエラーが出ることを確かめる。
-     * 一般ユーザーが自分の勤怠に POST /attendance/{id} で comment を配列 ['a'] にして送り、rules() が comment の string で止めて、/attendance/{id} へ戻り、申請ができないかを見る。
+     * comment が配列 ['a'] なら、/attendance/{id} へ戻り、comment に「備考が不適切な値です」が出ることを確かめる。
+     * 一般ユーザーが自分の勤怠に POST /attendance/{id} で comment を配列 ['a'] にして送り、rules() が comment の string で止めて、/attendance/{id} へ戻り、「備考が不適切な値です」が出て、申請ができないかを見る。
      *
      * @return void 返す値はない
      */
@@ -385,7 +385,7 @@ class AttendanceDetailRequestTest extends TestCase
         $response = $this->postAsUser(['comment' => ['a']]);
 
         $response->assertRedirect('/attendance/'.$this->attendanceRecord->id);
-        $response->assertSessionHasErrors('comment');
+        $response->assertSessionHasErrors(['comment' => '備考が不適切な値です']);
         $this->assertDatabaseCount('applications', 0);
     }
 
@@ -404,14 +404,14 @@ class AttendanceDetailRequestTest extends TestCase
     }
 
     /**
-     * 休憩の戻りが abc なら、new_break_out.0 に「休憩時間が不適切な値です」が出ることを確かめる。
-     * 一般ユーザーが自分の勤怠に POST /attendance/{id} で休憩の戻りを abc にして送り、rules() が new_break_out.* の date_format:H:i で止めて、「休憩時間が不適切な値です」が出て、申請ができないかを見る。
+     * 休憩の戻りが秒まである時刻なら、new_break_out.0 に「休憩時間が不適切な値です」が出ることを確かめる。
+     * 一般ユーザーが自分の勤怠に POST /attendance/{id} で休憩の入りを 12:00、戻りを 13:00:00 にして送り、rules() が new_break_out.* の date_format:H:i で止めて、「休憩時間が不適切な値です」が出て、申請ができないかを見る。
      *
      * @return void 返す値はない
      */
     public function test_break_out_format(): void
     {
-        $response = $this->postAsUser(['new_break_in' => ['12:00', ''], 'new_break_out' => ['abc', '']]);
+        $response = $this->postAsUser(['new_break_in' => ['12:00', ''], 'new_break_out' => ['13:00:00', '']]);
 
         $response->assertSessionHasErrors(['new_break_out.0' => '休憩時間が不適切な値です']);
         $this->assertDatabaseCount('applications', 0);

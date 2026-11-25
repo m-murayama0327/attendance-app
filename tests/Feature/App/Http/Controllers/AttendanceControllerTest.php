@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\App\Http\Controllers;
 
+use App\Http\Controllers\AttendanceController;
 use App\Models\Application;
 use App\Models\AttendanceBreak;
 use App\Models\AttendanceRecord;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
@@ -16,7 +18,7 @@ class AttendanceControllerTest extends TestCase
 
     /**
      * 開く日時が 2026-06-01（月）08:05 なら、「2026年6月1日(月)」と「08:05」が出ることを確かめる。
-     * 2026-06-01 08:05 に一般ユーザーが GET /attendance を送り、index() が今の日付と時刻を表示用の文字にして、200 で user.attendance-register が返り、「2026年6月1日(月)」と「08:05」が出るかを見る。
+     * 2026-06-01 08:05 に一般ユーザーが GET /attendance を送り、index() が今の日付と時刻を表示用の文字にして、200 で user.attendance-register が返り、欄の値がちょうど「2026年6月1日(月)」と「08:05」かを見る。
      *
      * @return void 返す値はない
      */
@@ -29,8 +31,33 @@ class AttendanceControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertViewIs('user.attendance-register');
-        $response->assertSee('2026年6月1日(月)');
-        $response->assertSee('08:05');
+        $response->assertSee('value="2026年6月1日(月)"', false);
+        $response->assertSee('value="08:05"', false);
+    }
+
+    /**
+     * 打刻の画面を作る途中で0時を過ぎても、画面に渡す日付と時刻が同じ1つの今の日時から作られることを確かめる。
+     * テストから、最初に読む今の日時だけが 2026-11-30 23:59:59 で2回目からは 2026-12-01 00:00:00 になる時計で、一般ユーザーのリクエストを index() に渡して呼び、index() が今の日時を1回だけ取って、formattedDate が「2026年11月30日(月)」、formattedTime が「23:59」かを見る。
+     *
+     * @return void 返す値はない
+     */
+    public function test_date_and_time_are_taken_once(): void
+    {
+        $user = User::factory()->create(['admin_status' => false]);
+        $request = Request::create('/attendance');
+        $request->setUserResolver(fn (): User => $user);
+        $isFirstRead = true;
+        $this->travelTo(function () use (&$isFirstRead): Carbon {
+            $now = Carbon::parse($isFirstRead ? '2026-11-30 23:59:59' : '2026-12-01 00:00:00');
+            $isFirstRead = false;
+
+            return $now;
+        });
+
+        $view = app(AttendanceController::class)->index($request);
+
+        $this->assertSame('2026年11月30日(月)', $view->getData()['formattedDate']);
+        $this->assertSame('23:59', $view->getData()['formattedTime']);
     }
 
     /**
@@ -276,7 +303,7 @@ class AttendanceControllerTest extends TestCase
         $response->assertSee('name="new_clock_out" value=""', false);
         $response->assertSee('name="new_break_in[0]" value=""', false);
         $response->assertSee('name="new_break_out[0]" value=""', false);
-        $response->assertSee('id="comment" name="comment" value=""', false);
+        $response->assertSee('id="comment" name="comment"></textarea>', false);
     }
 
     /**
@@ -301,7 +328,7 @@ class AttendanceControllerTest extends TestCase
         $response->assertSee('name="new_clock_out" value=""', false);
         $response->assertSee('name="new_break_in[0]" value=""', false);
         $response->assertSee('name="new_break_out[0]" value=""', false);
-        $response->assertSee('id="comment" name="comment" value=""', false);
+        $response->assertSee('id="comment" name="comment"></textarea>', false);
     }
 
     /**
