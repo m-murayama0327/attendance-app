@@ -29,6 +29,9 @@ class AttendanceRecord extends Model
 
     public const ACTIONS = [self::ACTION_CLOCK_IN, self::ACTION_CLOCK_OUT, self::ACTION_BREAK_IN, self::ACTION_BREAK_OUT];
 
+    // 勤怠と申請の備考のカラムに入る文字数の上限で、これより長い備考は受けない。
+    public const COMMENT_MAX_LENGTH = 255;
+
     // 要件で決まった始業と終業の時刻で、出勤がこれより後なら遅刻、退勤がこれより前なら早退にする
     private const START_TIME = '09:00';
 

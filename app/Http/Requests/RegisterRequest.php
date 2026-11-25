@@ -6,6 +6,15 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class RegisterRequest extends FormRequest
 {
+    // users の name のカラムに入る文字数の上限で、これより長い名前は受けない。
+    private const NAME_MAX_LENGTH = 255;
+
+    // users の email のカラムに入る文字数の上限で、これより長いメールアドレスは受けない。
+    private const EMAIL_MAX_LENGTH = 255;
+
+    // 要件で決まったパスワードの文字数の下限で、これより短いパスワードは受けない。
+    private const PASSWORD_MIN_LENGTH = 8;
+
     /**
      * 会員登録は、ログインしていない人が行うので、だれでも送れるようにする。
      *
@@ -24,9 +33,9 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8'],
+            'name' => ['required', 'string', 'max:'.self::NAME_MAX_LENGTH],
+            'email' => ['required', 'email', 'max:'.self::EMAIL_MAX_LENGTH, 'unique:users'],
+            'password' => ['required', 'string', 'min:'.self::PASSWORD_MIN_LENGTH],
             'password_confirmation' => ['required', 'same:password'],
         ];
     }
@@ -41,14 +50,14 @@ class RegisterRequest extends FormRequest
         return [
             'name.required' => 'お名前を入力してください',
             'name.string' => 'お名前は文字で入力してください',
-            'name.max' => 'お名前は255文字以内で入力してください',
+            'name.max' => 'お名前は'.self::NAME_MAX_LENGTH.'文字以内で入力してください',
             'email.required' => 'メールアドレスを入力してください',
             'email.email' => 'メールアドレスはメール形式で入力してください',
-            'email.max' => 'メールアドレスは255文字以内で入力してください',
+            'email.max' => 'メールアドレスは'.self::EMAIL_MAX_LENGTH.'文字以内で入力してください',
             'email.unique' => 'このメールアドレスは既に登録されています',
             'password.required' => 'パスワードを入力してください',
             'password.string' => 'パスワードは文字で入力してください',
-            'password.min' => 'パスワードは8文字以上で入力してください',
+            'password.min' => 'パスワードは'.self::PASSWORD_MIN_LENGTH.'文字以上で入力してください',
             'password_confirmation.required' => 'パスワードと一致しません',
             'password_confirmation.same' => 'パスワードと一致しません',
         ];

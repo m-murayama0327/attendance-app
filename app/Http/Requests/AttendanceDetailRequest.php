@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AttendanceRecord;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -35,7 +36,7 @@ class AttendanceDetailRequest extends FormRequest
             'new_break_out' => ['array'],
             'new_break_in.*' => ['nullable', 'required_with:new_break_out.*', 'date_format:H:i', 'after_or_equal:new_clock_in', 'before_or_equal:new_clock_out'],
             'new_break_out.*' => ['nullable', 'required_with:new_break_in.*', 'date_format:H:i', 'after:new_break_in.*', 'before_or_equal:new_clock_out'],
-            'comment' => ['required', 'string', 'max:255'],
+            'comment' => ['required', 'string', 'max:'.AttendanceRecord::COMMENT_MAX_LENGTH],
         ];
     }
 
@@ -95,7 +96,7 @@ class AttendanceDetailRequest extends FormRequest
             'new_break_out.*.before_or_equal' => '休憩時間もしくは退勤時間が不適切な値です',
             'comment.required' => '備考を記入してください',
             'comment.string' => '備考が不適切な値です',
-            'comment.max' => '備考は255文字以内で入力してください',
+            'comment.max' => '備考は'.AttendanceRecord::COMMENT_MAX_LENGTH.'文字以内で入力してください',
         ];
     }
 }
