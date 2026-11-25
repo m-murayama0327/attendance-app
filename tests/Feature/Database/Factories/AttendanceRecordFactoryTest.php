@@ -4,8 +4,8 @@ namespace Tests\Feature\Database\Factories;
 
 use App\Models\AttendanceRecord;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class AttendanceRecordFactoryTest extends TestCase

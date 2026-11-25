@@ -6,8 +6,8 @@ use App\Models\Application;
 use App\Models\AttendanceBreak;
 use App\Models\AttendanceRecord;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class UserDetailTest extends TestCase

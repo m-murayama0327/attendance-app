@@ -4,10 +4,10 @@ namespace Tests\Feature\Database\Seeders;
 
 use App\Models\AttendanceRecord;
 use App\Models\User;
-use Carbon\Carbon;
 use Database\Seeders\AttendanceRecordSeeder;
 use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
 

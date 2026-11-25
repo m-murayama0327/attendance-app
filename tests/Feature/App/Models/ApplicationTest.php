@@ -7,8 +7,8 @@ use App\Models\AttendanceBreak;
 use App\Models\AttendanceRecord;
 use App\Models\ProposalBreak;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

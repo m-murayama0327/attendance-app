@@ -3,8 +3,8 @@
 namespace Tests\Feature\Resources\Views\User;
 
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class UserAttendanceListTest extends TestCase
