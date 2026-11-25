@@ -30,7 +30,7 @@ class AttendanceRecordController extends Controller
             ->when($request->filled('month'), fn (Builder $query): Builder => $query->where('date', 'like', $request->validated('month').'-%'))
             ->latest('date')
             ->orderByDesc('id')
-            ->paginate($request->validated('per_page') ?? 20)
+            ->paginate($request->validated('per_page') ?? IndexAttendanceRecordRequest::DEFAULT_PER_PAGE)
             ->withQueryString();
 
         return AttendanceRecordResource::collection($attendanceRecords);

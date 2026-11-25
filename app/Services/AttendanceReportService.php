@@ -9,6 +9,9 @@ use Illuminate\Support\Collection;
 
 class AttendanceReportService
 {
+    // 要件で決まった集計の期間で、当月を含むこの月数の勤怠を集計する。
+    private const MONTH_COUNT = 6;
+
     /**
      * 渡されたユーザーの当月を含む6か月の勤怠を1回のクエリで読み、マイ勤怠レポートの3つの集計を返す。
      * 今日の日付は最初に1回だけ取り、3つの集計に渡す。こうすると、集計の途中で日付が変わっても、読む範囲と出す月が食い違わない。
@@ -19,7 +22,7 @@ class AttendanceReportService
     public function build(User $user): array
     {
         $today = Carbon::today();
-        $start = $today->copy()->subMonthsNoOverflow(5)->startOfMonth();
+        $start = $today->copy()->subMonthsNoOverflow(self::MONTH_COUNT - 1)->startOfMonth();
         $end = $today->copy()->endOfMonth();
 
         $attendanceRecords = AttendanceRecord::where('user_id', $user->id)
@@ -61,7 +64,7 @@ class AttendanceReportService
     {
         $recordsByMonth = $attendanceRecords->groupBy(fn (AttendanceRecord $attendanceRecord): string => substr($attendanceRecord->date, 0, 7));
 
-        return collect(range(5, 0))
+        return collect(range(self::MONTH_COUNT - 1, 0))
             ->map(function (int $monthsAgo) use ($recordsByMonth, $today): array {
                 $month = $today->copy()->subMonthsNoOverflow($monthsAgo)->format('Y-m');
                 $monthRecords = $recordsByMonth->get($month, collect());
