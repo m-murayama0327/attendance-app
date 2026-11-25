@@ -104,6 +104,19 @@ class AttendanceRecord extends Model
     }
 
     /**
+     * 日付が渡された初めの日から終わりの日まで（両端の日を含む）の勤怠に絞る。
+     *
+     * @param  Builder<AttendanceRecord>  $query  絞る前の勤怠のクエリ
+     * @param  Carbon  $start  範囲の初めの日
+     * @param  Carbon  $end  範囲の終わりの日
+     * @return void 返す値はない
+     */
+    public function scopeBetweenDates(Builder $query, Carbon $start, Carbon $end): void
+    {
+        $query->whereBetween('date', [$start->toDateString(), $end->toDateString()]);
+    }
+
+    /**
      * 休憩時間、勤務時間、残業時間と、遅刻、早退、長時間労働のフラグを計算して保存する。
      * 時刻を書いた後に呼ぶ。退勤がないときは、勤務時間と残業時間を空にする。
      *
@@ -324,8 +337,8 @@ class AttendanceRecord extends Model
         $start = $month->copy()->startOfMonth();
         $end = $month->copy()->endOfMonth();
 
-        $attendanceRecords = self::where('user_id', $user->id)
-            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+        $attendanceRecords = $user->attendanceRecords()
+            ->betweenDates($start, $end)
             ->get()
             ->keyBy('date');
 

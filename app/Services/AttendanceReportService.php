@@ -25,8 +25,8 @@ class AttendanceReportService
         $start = $today->copy()->subMonthsNoOverflow(self::MONTH_COUNT - 1)->startOfMonth();
         $end = $today->copy()->endOfMonth();
 
-        $attendanceRecords = AttendanceRecord::where('user_id', $user->id)
-            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+        $attendanceRecords = $user->attendanceRecords()
+            ->betweenDates($start, $end)
             ->get(['date', 'work_minutes', 'overtime_minutes', 'is_late_arrival', 'is_early_departure', 'is_long_work']);
 
         return [
