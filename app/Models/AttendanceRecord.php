@@ -132,7 +132,7 @@ class AttendanceRecord extends Model
         }
 
         $clockOut = $this->toMinutes($this->clock_out);
-        $workMinutes = max($clockOut - $clockIn - $breakMinutes, 0);
+        $workMinutes = $clockOut - $clockIn - $breakMinutes;
 
         $this->work_minutes = $workMinutes;
         $this->overtime_minutes = max($workMinutes - self::REGULAR_WORK_MINUTES, 0);
