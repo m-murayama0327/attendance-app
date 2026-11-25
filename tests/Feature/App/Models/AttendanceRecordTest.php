@@ -543,10 +543,11 @@ class AttendanceRecordTest extends TestCase
         $user = User::factory()->create(['admin_status' => false]);
 
         $response = $this->stamp($user, '2026-06-01 09:30:15', AttendanceRecord::ACTION_CLOCK_IN);
+        $stampPage = $this->actingAs($user)->get('/attendance');
 
         $response->assertRedirect('/attendance');
         $this->assertDatabaseHas('attendance_records', ['user_id' => $user->id, 'date' => '2026-06-01', 'clock_in' => '09:30:15']);
-        $this->actingAs($user)->get('/attendance')->assertSee('出勤中');
+        $stampPage->assertSee('出勤中');
     }
 
     /**
@@ -628,12 +629,14 @@ class AttendanceRecordTest extends TestCase
         $this->stamp($user, '2026-06-01 09:00:00', AttendanceRecord::ACTION_CLOCK_IN);
 
         $response = $this->stamp($user, '2026-06-01 18:00:20', AttendanceRecord::ACTION_CLOCK_OUT);
+        $stampPage = $this->actingAs($user)->get('/attendance');
 
         $response->assertRedirect('/attendance');
         $attendanceRecord = AttendanceRecord::sole();
         $this->assertSame('18:00:20', $attendanceRecord->clock_out);
         $this->assertSame(540, $attendanceRecord->work_minutes);
-        $this->actingAs($user)->get('/attendance')->assertSee('退勤済')->assertSee('お疲れ様でした。');
+        $stampPage->assertSee('退勤済');
+        $stampPage->assertSee('お疲れ様でした。');
     }
 
     /**
@@ -668,11 +671,12 @@ class AttendanceRecordTest extends TestCase
         $this->stamp($user, '2026-06-01 09:00:00', AttendanceRecord::ACTION_CLOCK_IN);
 
         $response = $this->stamp($user, '2026-06-01 12:00:00', AttendanceRecord::ACTION_BREAK_IN);
+        $stampPage = $this->actingAs($user)->get('/attendance');
 
         $response->assertRedirect('/attendance');
         $this->assertDatabaseCount('breaks', 1);
         $this->assertDatabaseHas('breaks', ['break_in' => '12:00:00', 'break_out' => null]);
-        $this->actingAs($user)->get('/attendance')->assertSee('休憩中');
+        $stampPage->assertSee('休憩中');
     }
 
     /**
@@ -723,9 +727,10 @@ class AttendanceRecordTest extends TestCase
         $this->stamp($user, '2026-06-01 12:00:00', AttendanceRecord::ACTION_BREAK_IN);
 
         $this->stamp($user, '2026-06-01 12:00:00', AttendanceRecord::ACTION_BREAK_OUT);
+        $stampPage = $this->actingAs($user)->get('/attendance');
 
         $this->assertDatabaseHas('breaks', ['break_in' => '12:00:00', 'break_out' => null]);
-        $this->actingAs($user)->get('/attendance')->assertSee('休憩中');
+        $stampPage->assertSee('休憩中');
     }
 
     /**
@@ -762,12 +767,14 @@ class AttendanceRecordTest extends TestCase
         $this->stamp($user, '2026-06-01 12:00:00', AttendanceRecord::ACTION_BREAK_IN);
 
         $response = $this->stamp($user, '2026-06-01 13:00:00', AttendanceRecord::ACTION_BREAK_OUT);
+        $stampPage = $this->actingAs($user)->get('/attendance');
 
         $response->assertRedirect('/attendance');
         $this->assertDatabaseCount('breaks', 1);
         $this->assertDatabaseHas('breaks', ['break_in' => '12:00:00', 'break_out' => '13:00:00']);
         $this->assertSame(60, AttendanceRecord::sole()->break_minutes);
-        $this->actingAs($user)->get('/attendance')->assertSee('出勤中')->assertSee('value="break_in"', false);
+        $stampPage->assertSee('出勤中');
+        $stampPage->assertSee('value="break_in"', false);
     }
 
     /**

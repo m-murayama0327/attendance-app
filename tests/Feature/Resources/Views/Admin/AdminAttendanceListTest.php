@@ -23,7 +23,7 @@ class AdminAttendanceListTest extends TestCase
         User::factory()->create(['admin_status' => false, 'name' => '山田太郎']);
         $this->travelTo(Carbon::parse('2026-06-03 10:00:00'));
 
-        $response = $this->actingAs($admin)->get('/admin/attendance/list?date=2026-06-02');
+        $response = $this->actingAs($admin)->get('/admin/attendance/list?'.http_build_query(['date' => '2026-06-02']));
 
         $response->assertOk();
         $emptyCell = '<p class="table__description--item"></p>';
@@ -42,7 +42,7 @@ class AdminAttendanceListTest extends TestCase
         $user = User::factory()->create(['admin_status' => false]);
         $this->travelTo(Carbon::parse('2026-06-03 10:00:00'));
 
-        $response = $this->actingAs($admin)->get('/admin/attendance/list?date=2026-06-02');
+        $response = $this->actingAs($admin)->get('/admin/attendance/list?'.http_build_query(['date' => '2026-06-02']));
 
         $response->assertOk();
         $response->assertSee('href="'.url('/admin/attendance/staff/'.$user->id.'/date/2026-06-02').'"', false);
@@ -60,7 +60,7 @@ class AdminAttendanceListTest extends TestCase
         $user = User::factory()->create(['admin_status' => false]);
         $this->travelTo(Carbon::parse('2026-06-03 10:00:00'));
 
-        $response = $this->actingAs($admin)->get('/admin/attendance/list?date=2026-06-03');
+        $response = $this->actingAs($admin)->get('/admin/attendance/list?'.http_build_query(['date' => '2026-06-03']));
 
         $response->assertOk();
         $response->assertDontSee(url('/admin/attendance/staff/'.$user->id.'/date/2026-06-03'), false);
