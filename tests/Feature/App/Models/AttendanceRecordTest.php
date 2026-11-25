@@ -212,13 +212,14 @@ class AttendanceRecordTest extends TestCase
 
     /**
      * 退勤がないなら、work_minutes と overtime_minutes が空で、is_early_leave と is_long_work が false になることを確かめる。
-     * 9:00 出勤で退勤がなく、休憩 12:00〜13:00 の勤怠があるときに、テストから recalculate() を呼び、退勤のない勤怠を計算して、break_minutes が 60、is_late が false かを見る。
+     * work_minutes、overtime_minutes、is_early_leave、is_long_work を 601、121、true、true にしておいた、9:00 出勤で退勤がなく、休憩 12:00〜13:00 の勤怠があるときに、テストから recalculate() を呼び、退勤のない勤怠を計算して、break_minutes が 60、is_late が false かを見る。
      *
      * @return void 返す値はない
      */
     public function test_recalculate_without_clock_out(): void
     {
         $attendanceRecord = $this->createRecord('09:00:00', null, [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord->forceFill(['work_minutes' => 601, 'overtime_minutes' => 121, 'is_early_leave' => true, 'is_long_work' => true])->save();
 
         $attendanceRecord->recalculate();
 
@@ -265,13 +266,14 @@ class AttendanceRecordTest extends TestCase
 
     /**
      * 出勤が 9:00:59 なら、is_late が false になることを確かめる。
-     * 9:00:59 出勤の勤怠があるときに、テストから recalculate() を呼び、出勤の時刻で遅刻を決めて、is_late が false かを見る。
+     * is_late を true にしておいた 9:00:59 出勤の勤怠があるときに、テストから recalculate() を呼び、出勤の時刻で遅刻を決めて、is_late が false かを見る。
      *
      * @return void 返す値はない
      */
     public function test_not_late_at_nine_with_seconds(): void
     {
         $attendanceRecord = $this->createRecord('09:00:59', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord->forceFill(['is_late' => true])->save();
 
         $attendanceRecord->recalculate();
 
@@ -295,13 +297,14 @@ class AttendanceRecordTest extends TestCase
 
     /**
      * 退勤が 18:00:00 なら、is_early_leave が false になることを確かめる。
-     * 18:00:00 退勤の勤怠があるときに、テストから recalculate() を呼び、退勤の時刻で早退を決めて、is_early_leave が false かを見る。
+     * is_early_leave を true にしておいた 18:00:00 退勤の勤怠があるときに、テストから recalculate() を呼び、退勤の時刻で早退を決めて、is_early_leave が false かを見る。
      *
      * @return void 返す値はない
      */
     public function test_not_early_leave_at_eighteen(): void
     {
         $attendanceRecord = $this->createRecord('09:00:00', '18:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord->forceFill(['is_early_leave' => true])->save();
 
         $attendanceRecord->recalculate();
 
@@ -342,13 +345,14 @@ class AttendanceRecordTest extends TestCase
 
     /**
      * 8:00〜19:00 で休憩 12:00〜13:00 なら、is_long_work が false になることを確かめる。
-     * 8:00〜19:00 で休憩1時間の勤怠があるときに、テストから recalculate() を呼び、勤務の分で長時間労働を決めて、work_minutes が 600 かを見る。
+     * is_long_work を true にしておいた 8:00〜19:00 で休憩1時間の勤怠があるときに、テストから recalculate() を呼び、勤務の分で長時間労働を決めて、work_minutes が 600 かを見る。
      *
      * @return void 返す値はない
      */
     public function test_not_long_work_at_ten_hours(): void
     {
         $attendanceRecord = $this->createRecord('08:00:00', '19:00:00', [['break_in' => '12:00:00', 'break_out' => '13:00:00']]);
+        $attendanceRecord->forceFill(['is_long_work' => true])->save();
 
         $attendanceRecord->recalculate();
 

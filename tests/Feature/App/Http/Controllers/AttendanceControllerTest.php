@@ -18,7 +18,7 @@ class AttendanceControllerTest extends TestCase
 
     /**
      * 開く日時が 2026-06-01（月）08:05 なら、「2026年6月1日(月)」と「08:05」が出ることを確かめる。
-     * 2026-06-01 08:05 に一般ユーザーが GET /attendance を送り、index() が今の日付と時刻を表示用の文字にして、200 で user.attendance-register が返り、「2026年6月1日(月)」と「08:05」が出るかを見る。
+     * 2026-06-01 08:05 に一般ユーザーが GET /attendance を送り、index() が今の日付と時刻を表示用の文字にして、200 で user.attendance-register が返り、欄の値がちょうど「2026年6月1日(月)」と「08:05」かを見る。
      *
      * @return void 返す値はない
      */
@@ -31,8 +31,8 @@ class AttendanceControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertViewIs('user.attendance-register');
-        $response->assertSee('2026年6月1日(月)');
-        $response->assertSee('08:05');
+        $response->assertSee('value="2026年6月1日(月)"', false);
+        $response->assertSee('value="08:05"', false);
     }
 
     /**

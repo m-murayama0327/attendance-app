@@ -39,7 +39,7 @@ class AttendanceControllerTest extends TestCase
 
     /**
      * その日に一般ユーザーの勤怠があるなら、その人の名前、「09:00」「18:00」「1:00」、/attendance/{id} のリンクが出ることを確かめる。
-     * 一般ユーザーの 2026-06-01 の勤怠（09:00〜18:00、休憩 12:00〜13:00）があるときに、管理者が同じ日に GET /admin/attendance/list を送り、index() がその日の勤怠を探して、200 で行の値と total_time 08:00 が渡るかを見る。
+     * 一般ユーザーの 2026-06-01 の勤怠（09:00〜18:00、休憩 12:00〜13:00）があるときに、管理者が同じ日に GET /admin/attendance/list を送り、index() がその日の勤怠を探して、200 で中身がちょうど「09:00」「18:00」「1:00」の欄と total_time 08:00 が渡るかを見る。
      *
      * @return void 返す値はない
      */
@@ -64,7 +64,7 @@ class AttendanceControllerTest extends TestCase
         $response = $this->actingAs($admin)->get('/admin/attendance/list');
 
         $response->assertOk();
-        $response->assertSeeInOrder(['山田 太郎', '09:00', '18:00', '1:00']);
+        $response->assertSeeInOrder(['山田 太郎', '>09:00<', '>18:00<', '>1:00<'], false);
         $response->assertSee('href="'.url('/attendance/'.$attendanceRecord->id).'"', false);
         $response->assertViewHas('attendanceRecords', fn ($attendanceRecords): bool => $attendanceRecords->first()->total_time === '08:00');
     }
@@ -349,7 +349,7 @@ class AttendanceControllerTest extends TestCase
 
     /**
      * 承認待ちの申請があっても、エラーで戻ったときの送った 10:00 が欄に残り、休憩の行の番号がエラーと合い、空の行が1つだけ出ることを確かめる。
-     * 承認待ちの申請がある勤怠に出勤 10:00 などを送ってエラーで戻った後に、管理者が GET /attendance/{id} を送り、renderDetail() が送った値を渡して、200 で admin.admin-detail が返り、10:00 が残り、1行目の休憩の欄の後に「休憩時間が不適切な値です」が出て、2行目の休憩の欄が空で出て、3行目の休憩の欄が出ないかを見る。
+     * 承認待ちの申請がある勤怠に出勤 10:00 と、1行目が空で2行目が 19:00〜13:00 の休憩などを送ってエラーで戻った後に、管理者が GET /attendance/{id} を送り、renderDetail() が送った値を渡して、200 で admin.admin-detail が返り、10:00 が残り、2行目の休憩の欄の後に「休憩時間が不適切な値です」が出て、3行目の休憩の欄が空で出て、4行目の休憩の欄が出ないかを見る。
      *
      * @return void 返す値はない
      */
@@ -372,8 +372,8 @@ class AttendanceControllerTest extends TestCase
             ->post('/attendance/'.$attendanceRecord->id, [
                 'new_clock_in' => '10:00',
                 'new_clock_out' => '18:00',
-                'new_break_in' => ['19:00', ''],
-                'new_break_out' => ['13:00', ''],
+                'new_break_in' => ['', '19:00', ''],
+                'new_break_out' => ['', '13:00', ''],
                 'comment' => '',
             ]);
 
@@ -382,9 +382,9 @@ class AttendanceControllerTest extends TestCase
         $response->assertOk();
         $response->assertViewIs('admin.admin-detail');
         $response->assertSee('value="10:00"', false);
-        $response->assertSeeInOrder(['name="new_break_in[0]"', '休憩時間が不適切な値です', 'name="new_break_in[1]"'], false);
-        $response->assertSee('name="new_break_in[1]" value=""', false);
-        $response->assertDontSee('name="new_break_in[2]"', false);
+        $response->assertSeeInOrder(['name="new_break_in[1]"', '休憩時間が不適切な値です', 'name="new_break_in[2]"'], false);
+        $response->assertSee('name="new_break_in[2]" value=""', false);
+        $response->assertDontSee('name="new_break_in[3]"', false);
     }
 
     /**

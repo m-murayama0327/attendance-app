@@ -33,8 +33,8 @@ class ApplicationFactoryTest extends TestCase
     }
 
     /**
-     * 2026-06-15 に user_id だけを渡して申請を作ると、date が 2026-05-16〜2026-06-14 の間になることを確かめる。
-     * テストから 2026-06-15 に時刻を固定して一般ユーザーの user_id だけを申請のファクトリーの make() に渡して50行作り、definition() が今日から1〜30日前の日を入れて、date が全部 2026-05-16〜2026-06-14 の間かを見る。
+     * 2026-06-15 に user_id だけを渡して申請を作ると、date が 2026-05-16〜2026-06-14 の間になり、両端の日も入ることを確かめる。
+     * テストから 2026-06-15 に時刻を固定し、乱数の種を 1 に決めて、一般ユーザーの user_id だけを申請のファクトリーの make() に渡して50行作り、definition() が今日から1〜30日前の日を入れて、date が全部 2026-05-16〜2026-06-14 の間で、一番前が 2026-05-16、一番後が 2026-06-14 かを見る。
      *
      * @return void 返す値はない
      */
@@ -42,9 +42,13 @@ class ApplicationFactoryTest extends TestCase
     {
         $this->travelTo(Carbon::parse('2026-06-15 10:00:00'));
         $user = User::factory()->create(['admin_status' => false]);
+        // 種を決めると毎回同じ日付の並びになる。種の 1 は、50行の中に範囲の両端の日が入る並びになるものを選んだ。
+        fake()->seed(1);
 
         $applications = Application::factory()->count(50)->make(['user_id' => $user->id]);
 
         $this->assertTrue($applications->every(fn (Application $application): bool => $application->date >= '2026-05-16' && $application->date <= '2026-06-14'));
+        $this->assertSame('2026-05-16', $applications->min('date'));
+        $this->assertSame('2026-06-14', $applications->max('date'));
     }
 }
