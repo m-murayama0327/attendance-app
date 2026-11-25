@@ -16,16 +16,19 @@ class AttendanceController extends Controller
 {
     /**
      * 打刻の画面を出す。今の日付と時刻を表示用の文字にして、ログインしているユーザーと一緒に渡す。
+     * 日付と時刻は、1回だけ取った今の日時から作る。こうすると、0時をまたいでも、日付と時刻が食い違わない。
      *
      * @param  Request  $request  届いたリクエスト
      * @return View 打刻の画面
      */
     public function index(Request $request): View
     {
+        $now = now();
+
         return view('user.attendance-register', [
             'user' => $request->user(),
-            'formattedDate' => now()->isoFormat('YYYY年M月D日(ddd)'),
-            'formattedTime' => now()->format('H:i'),
+            'formattedDate' => $now->isoFormat('YYYY年M月D日(ddd)'),
+            'formattedTime' => $now->format('H:i'),
         ]);
     }
 

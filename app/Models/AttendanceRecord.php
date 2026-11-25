@@ -140,15 +140,17 @@ class AttendanceRecord extends Model
 
     /**
      * 今の時刻で出勤を打刻し、今日の勤怠を返す。同じ日の勤怠がもうあれば、その行を返して書き換えない。
+     * 日付と時刻は、1回だけ取った今の日時から作る。こうすると、0時をまたいでも、日付と時刻が食い違わない。
      *
      * @param  User  $user  出勤するユーザー
      * @return self 今日の勤怠
      */
     public static function clockIn(User $user): self
     {
+        $now = now();
         $attendanceRecord = self::createOrFirst(
-            ['user_id' => $user->id, 'date' => today()->toDateString()],
-            ['clock_in' => now()->toTimeString()],
+            ['user_id' => $user->id, 'date' => $now->toDateString()],
+            ['clock_in' => $now->toTimeString()],
         );
 
         if ($attendanceRecord->wasRecentlyCreated) {
